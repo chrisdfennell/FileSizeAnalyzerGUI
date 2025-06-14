@@ -1,6 +1,6 @@
 # FileSizeAnalyzer Pro
 
-![FileSizeAnalyzer Pro Screenshot](https://imgur.com/a/CpPCjHv)
+![FileSizeAnalyzer Pro Screenshot](https://i.imgur.com/Sa2bvQi.png)
 
 ## Overview
 
