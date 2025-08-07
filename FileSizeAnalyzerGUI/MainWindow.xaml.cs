@@ -1,5 +1,5 @@
-﻿using Microsoft.Win32;
-using Microsoft.VisualBasic.FileIO;
+﻿using Microsoft.VisualBasic.FileIO;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -14,76 +14,63 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace FileSizeAnalyzerGUI
 {
     public partial class MainWindow : Window
     {
-        private List<FileSystemNode> selectedFiles;
-        private List<FileSystemNode> allFiles;
-        private List<DuplicateSet> duplicates;
-        private List<FileTypeStats> fileTypes;
-        private List<FileAgeStats> fileAgeStats;
-        private List<FileSystemNode> largestFiles;
-        private List<FileSystemNode> emptyFolders;
-        private FileSystemNode rootNode;
-        private List<ScanHistoryEntry> scanHistory;
-        private readonly ObservableCollection<FileSystemNode> rootNodes;
-        private CancellationTokenSource cts;
-        private readonly StringBuilder scanErrors;
+        public ObservableCollection<FileSystemNode> RootNodes { get; set; }
+        public ObservableCollection<FileSystemNode> AllFiles { get; set; }
+        public ObservableCollection<FileSystemNode> SelectedFiles { get; set; }
+        public ObservableCollection<DuplicateSet> Duplicates { get; set; }
+        public ObservableCollection<FileTypeStats> FileTypes { get; set; }
+        public ObservableCollection<FileAgeStats> FileAgeStats { get; set; }
+        public ObservableCollection<FileSystemNode> LargestFiles { get; set; }
+        public ObservableCollection<FileSystemNode> EmptyFolders { get; set; }
+        public ObservableCollection<ScanHistoryEntry> ScanHistory { get; set; }
+
+        private CancellationTokenSource _cts;
+        private readonly StringBuilder _scanErrors;
+        private DateTime _lastStatusUpdateTime; // For throttling UI updates
+
+        private static readonly string WindowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
 
         public MainWindow()
         {
             InitializeComponent();
 
-            scanHistory = new List<ScanHistoryEntry>();
-            rootNodes = new ObservableCollection<FileSystemNode>();
-            scanErrors = new StringBuilder();
+            RootNodes = new ObservableCollection<FileSystemNode>();
+            AllFiles = new ObservableCollection<FileSystemNode>();
+            SelectedFiles = new ObservableCollection<FileSystemNode>();
+            Duplicates = new ObservableCollection<DuplicateSet>();
+            FileTypes = new ObservableCollection<FileTypeStats>();
+            FileAgeStats = new ObservableCollection<FileAgeStats>();
+            LargestFiles = new ObservableCollection<FileSystemNode>();
+            EmptyFolders = new ObservableCollection<FileSystemNode>();
+            ScanHistory = new ObservableCollection<ScanHistoryEntry>();
+            _scanErrors = new StringBuilder();
+
+            this.DataContext = this;
 
             PopulateDrives();
-            ScanHistoryDataGrid.ItemsSource = scanHistory;
-            DirectoryTreeView.ItemsSource = rootNodes;
             DirectoryTreeView.SelectedItemChanged += DirectoryTreeView_SelectedItemChanged;
         }
 
-        #region Custom Window Chrome Handlers
-        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.ButtonState == MouseButtonState.Pressed)
-            {
-                DragMove();
-            }
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
-        {
-            Application.Current.Shutdown();
-        }
-
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            WindowState = WindowState.Minimized;
-        }
-
-        private void Maximize_Click(object sender, RoutedEventArgs e)
-        {
-            WindowState = (WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
-        }
-        #endregion
+        #region Window Control and Setup
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); }
+        private void Close_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
+        private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+        private void Maximize_Click(object sender, RoutedEventArgs e) => WindowState = (WindowState == WindowState.Maximized) ? WindowState.Normal : WindowState.Maximized;
 
         private void PopulateDrives()
         {
             try
             {
-                DriveSelectionComboBox.ItemsSource = DriveInfo.GetDrives()
-                    .Where(d => d.IsReady)
-                    .Select(d => d.Name)
-                    .ToList();
+                DriveSelectionComboBox.ItemsSource = DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => d.Name).ToList();
             }
             catch (Exception ex)
             {
-                scanErrors.AppendLine($"Could not retrieve drive list: {ex.Message}");
+                _scanErrors.AppendLine($"Could not retrieve drive list: {ex.Message}");
             }
         }
 
@@ -94,339 +81,476 @@ namespace FileSizeAnalyzerGUI
                 DirectoryPathTextBox.Text = drive;
             }
         }
+        #endregion
 
+        #region Scanning Logic
         private async void ScanButton_Click(object sender, RoutedEventArgs e)
         {
             string scanPath = DirectoryPathTextBox.Text;
-            if (string.IsNullOrWhiteSpace(scanPath)) { scanPath = Directory.GetCurrentDirectory(); DirectoryPathTextBox.Text = scanPath; }
-            if (!Directory.Exists(scanPath)) { MessageBox.Show($"The specified path '{scanPath}' does not exist.", "Invalid Path", MessageBoxButton.OK, MessageBoxImage.Error); return; }
+            if (string.IsNullOrWhiteSpace(scanPath) || !Directory.Exists(scanPath))
+            {
+                MessageBox.Show($"The specified path '{scanPath}' does not exist.", "Invalid Path", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            _cts = new CancellationTokenSource();
+            _scanErrors.Clear();
+            ResetUIForScan();
+
+            var nodeMap = new Dictionary<string, FileSystemNode>();
+
+            var nodeProgress = new Progress<FileSystemNode>(node =>
+            {
+                if (node.IsDirectory)
+                {
+                    if (node.Parent == null)
+                    {
+                        RootNodes.Add(node);
+                        nodeMap[node.FullPath] = node;
+                    }
+                    else if (nodeMap.TryGetValue(node.Parent.FullPath, out var parentNode))
+                    {
+                        parentNode.Children.Insert(0, node);
+                        nodeMap[node.FullPath] = node;
+                    }
+                }
+                else // Is a file
+                {
+                    node.FormattedSize = FormatSize(node.Size);
+                    AllFiles.Add(node);
+
+                    if (nodeMap.TryGetValue(node.Parent.FullPath, out var parentNode))
+                    {
+                        int i = 0;
+                        for (i = 0; i < parentNode.Children.Count; i++)
+                        {
+                            if (!parentNode.Children[i].IsDirectory && parentNode.Children[i].Size < node.Size)
+                            {
+                                break;
+                            }
+                        }
+                        parentNode.Children.Insert(i, node);
+                    }
+                    UpdateLargestFiles(node);
+                }
+            });
+
+            var textProgress = new Progress<string>(update => ProgressTextBlock.Text = update);
+
+            bool skipSystem = SkipSystemFilesCheckBox.IsChecked == true;
+            bool skipWindows = SkipWindowsDirCheckBox.IsChecked == true;
 
             try
             {
-                cts = new CancellationTokenSource();
-                scanErrors.Clear();
-                StopScanButton.IsEnabled = true;
-                ScanButton.Visibility = Visibility.Collapsed;
-                StopScanButton.Visibility = Visibility.Visible;
+                await Task.Run(() => ScanDirectoryRecursive(scanPath, null, nodeProgress, textProgress, _cts.Token, skipSystem, skipWindows), _cts.Token);
 
-                await Dispatcher.InvokeAsync(() => {
-                    ScanProgressBar.IsIndeterminate = true;
-                    ScanProgressBar.Visibility = Visibility.Visible;
-                    ProgressTextBlock.Text = "Preparing to scan...";
-                    ProgressTextBlock.Visibility = Visibility.Visible;
-                    rootNodes.Clear();
-                    ResultsDataGrid.ItemsSource = null;
-                    DuplicatesTreeView.ItemsSource = null;
-                    FileTypesDataGrid.ItemsSource = null;
-                    FileAgeDataGrid.ItemsSource = null;
-                    LargestFilesDataGrid.ItemsSource = null;
-                    EmptyFoldersDataGrid.ItemsSource = null;
-                    TreemapCanvas.Children.Clear();
-                    ReportsTextBox.Text = "";
-                });
-
-                var progress = new Progress<(int percent, string status)>(update => {
-                    if (cts.IsCancellationRequested) return;
-                    ScanProgressBar.IsIndeterminate = update.percent < 0;
-                    if (!ScanProgressBar.IsIndeterminate) ScanProgressBar.Value = update.percent;
-                    ProgressTextBlock.Text = update.status;
-                });
-
-                var scanner = new DirectoryScanner(progress, scanErrors);
-                rootNode = await scanner.ScanDirectoryAsync(scanPath, cts.Token);
-
-                if (cts.Token.IsCancellationRequested) { await ResetUIState("Scan cancelled by user.\n" + scanErrors.ToString()); return; }
-                if (rootNode == null) { await ResetUIState("Scan failed.\n" + scanErrors.ToString()); return; }
-
-                ProgressTextBlock.Text = "Scan complete. Calculating sizes and sorting...";
-                await Task.Run(() => {
-                    scanner.UpdateAllSizesAndFormatting(rootNode);
-                    SortAllNodesBySize(rootNode);
-                }, cts.Token);
-                rootNodes.Add(rootNode);
-
-                ProgressTextBlock.Text = "Analyzing files...";
-                allFiles = GetAllFiles(rootNode).Where(f => !f.IsDirectory).ToList();
-                ApplyFilters_Click(null, null);
-                largestFiles = allFiles.OrderByDescending(f => f.Size).Take(100).ToList();
-                emptyFolders = FindEmptyFolders(rootNode);
-                duplicates = await Task.Run(() => FindDuplicates(allFiles), cts.Token);
-                fileTypes = GetFileTypeStats();
-                fileAgeStats = GetFileAgeStats();
-
-                scanHistory.Add(new ScanHistoryEntry { ScanDate = DateTime.Now, Path = scanPath, TotalSize = rootNode.Size });
-                string report = GenerateReport(rootNode.Size) + "\n--- Scan Errors ---\n" + scanErrors.ToString();
-
-                await Dispatcher.InvokeAsync(() => {
-                    DuplicatesTreeView.ItemsSource = duplicates;
-                    FileTypesDataGrid.ItemsSource = fileTypes;
-                    FileAgeDataGrid.ItemsSource = fileAgeStats;
-                    LargestFilesDataGrid.ItemsSource = largestFiles;
-                    EmptyFoldersDataGrid.ItemsSource = emptyFolders;
-                    ScanHistoryDataGrid.ItemsSource = null;
-                    ScanHistoryDataGrid.ItemsSource = scanHistory;
-                    DrawTreemap();
-                });
-
-                await ResetUIState(report);
-                ProgressTextBlock.Text = "Analysis complete.";
-                await Task.Delay(2000);
+                if (!_cts.Token.IsCancellationRequested)
+                {
+                    ProgressTextBlock.Text = "Finalizing analysis...";
+                    await FinalizeAnalysisAsync(scanPath);
+                }
+                else
+                {
+                    ReportsTextBox.Text = "Scan cancelled by user.\n" + _scanErrors.ToString();
+                }
             }
-            catch (OperationCanceledException) { await ResetUIState("Scan cancelled by user.\n" + scanErrors.ToString()); }
-            catch (Exception ex) { MessageBox.Show($"An error occurred: {ex.Message}", "Error"); await ResetUIState($"Error: {ex.Message}\n" + scanErrors.ToString()); }
+            catch (OperationCanceledException)
+            {
+                ReportsTextBox.Text = "Scan cancelled by user.\n" + _scanErrors.ToString();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An unhandled error occurred: {ex.Message}", "Error");
+                ReportsTextBox.Text = $"Error: {ex.Message}\n" + _scanErrors.ToString();
+            }
             finally
             {
-                await Dispatcher.InvokeAsync(() => {
+                ResetUIAfterScan();
+                _cts?.Dispose();
+            }
+        }
+
+        private long ScanDirectoryRecursive(string path, FileSystemNode parent, IProgress<FileSystemNode> nodeProgress, IProgress<string> textProgress, CancellationToken token, bool skipSystem, bool skipWindows)
+        {
+            if (token.IsCancellationRequested) return 0;
+
+            if (skipWindows && path.StartsWith(WindowsDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            if ((DateTime.Now - _lastStatusUpdateTime).TotalMilliseconds > 100)
+            {
+                textProgress.Report($"Scanning: {path}");
+                _lastStatusUpdateTime = DateTime.Now;
+            }
+
+            DirectoryInfo dirInfo;
+            try
+            {
+                dirInfo = new DirectoryInfo(path);
+                // ####################################################################
+                // ## BUG FIX: Added 'parent != null' to ensure the root scan
+                // ## directory is NEVER skipped, even if it has the System attribute.
+                // ####################################################################
+                if (parent != null && skipSystem && dirInfo.Attributes.HasFlag(FileAttributes.System))
+                {
+                    return 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                _scanErrors.AppendLine($"Error accessing '{path}': {ex.Message}");
+                return 0;
+            }
+
+            var currentNode = new FileSystemNode
+            {
+                FullPath = dirInfo.FullName,
+                IsDirectory = true,
+                Parent = parent,
+                CreationTime = dirInfo.CreationTime,
+                LastWriteTime = dirInfo.LastWriteTime,
+                Icon = IconManager.GetIcon(dirInfo.FullName, true)
+            };
+            nodeProgress.Report(currentNode);
+
+            long currentSize = 0;
+
+            try
+            {
+                foreach (var file in dirInfo.EnumerateFiles())
+                {
+                    if (token.IsCancellationRequested) return 0;
+
+                    if (skipSystem && file.Attributes.HasFlag(FileAttributes.System))
+                    {
+                        continue;
+                    }
+
+                    currentSize += file.Length;
+                    var fileNode = new FileSystemNode
+                    {
+                        FullPath = file.FullName,
+                        IsDirectory = false,
+                        Parent = currentNode,
+                        Size = file.Length,
+                        CreationTime = file.CreationTime,
+                        LastWriteTime = file.LastWriteTime,
+                        Icon = IconManager.GetIcon(file.FullName, false)
+                    };
+                    nodeProgress.Report(fileNode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _scanErrors.AppendLine($"Error reading files in '{path}': {ex.Message}");
+            }
+
+            try
+            {
+                foreach (var subDir in dirInfo.EnumerateDirectories())
+                {
+                    currentSize += ScanDirectoryRecursive(subDir.FullName, currentNode, nodeProgress, textProgress, token, skipSystem, skipWindows);
+                }
+            }
+            catch (Exception ex)
+            {
+                _scanErrors.AppendLine($"Error reading subdirectories in '{path}': {ex.Message}");
+            }
+
+            currentNode.Size = currentSize;
+            currentNode.FormattedSize = FormatSize(currentSize);
+
+            return currentSize;
+        }
+
+        private async Task FinalizeAnalysisAsync(string scanPath)
+        {
+            var allFoundFiles = AllFiles.ToList();
+            var rootNode = RootNodes.FirstOrDefault();
+            if (rootNode == null) return;
+
+            UpdateBarWidths(rootNode);
+            SortAllNodesBySize(rootNode);
+            ApplyFilters_Click(null, null);
+            DrawTreemap();
+
+            var duplicateProgress = new Progress<DuplicateSet>(d => Duplicates.Add(d));
+            var emptyFolderProgress = new Progress<FileSystemNode>(ef => EmptyFolders.Add(ef));
+            var fileTypeProgress = new Progress<FileTypeStats>(ft => FileTypes.Add(ft));
+            var fileAgeProgress = new Progress<FileAgeStats>(fa => FileAgeStats.Add(fa));
+
+            var analysisTasks = new List<Task>
+            {
+                Task.Run(() => FindDuplicates(allFoundFiles, duplicateProgress, _cts.Token)),
+                Task.Run(() => FindEmptyFolders(rootNode, emptyFolderProgress, _cts.Token)),
+                Task.Run(() => GetFileTypeStats(allFoundFiles, fileTypeProgress, _cts.Token)),
+                Task.Run(() => GetFileAgeStats(allFoundFiles, fileAgeProgress, _cts.Token))
+            };
+
+            await Task.WhenAll(analysisTasks);
+
+            ScanHistory.Add(new ScanHistoryEntry { ScanDate = DateTime.Now, Path = scanPath, TotalSize = rootNode.Size });
+            ReportsTextBox.Text = GenerateReport(rootNode.Size) + "\n--- Scan Errors ---\n" + _scanErrors.ToString();
+        }
+
+
+        private void UpdateLargestFiles(FileSystemNode file)
+        {
+            if (LargestFiles.Count < 100)
+            {
+                LargestFiles.Add(file);
+            }
+            else if (file.Size > LargestFiles.Min(f => f.Size))
+            {
+                LargestFiles.Add(file);
+                var sorted = LargestFiles.OrderByDescending(f => f.Size).Take(100).ToList();
+                LargestFiles.Clear();
+                foreach (var f in sorted) LargestFiles.Add(f);
+            }
+        }
+
+        private void ResetUIForScan()
+        {
+            ScanButton.Visibility = Visibility.Collapsed;
+            StopScanButton.Visibility = Visibility.Visible;
+            ScanProgressBar.IsIndeterminate = true;
+            ScanProgressBar.Visibility = Visibility.Visible;
+            ProgressTextBlock.Text = "Scanning...";
+            ProgressTextBlock.Visibility = Visibility.Visible;
+
+            _lastStatusUpdateTime = DateTime.MinValue;
+
+            RootNodes.Clear();
+            AllFiles.Clear();
+            SelectedFiles.Clear();
+            Duplicates.Clear();
+            FileTypes.Clear();
+            FileAgeStats.Clear();
+            LargestFiles.Clear();
+            EmptyFolders.Clear();
+            TreemapCanvas.Children.Clear();
+            ReportsTextBox.Text = "";
+        }
+
+        private void ResetUIAfterScan()
+        {
+            ProgressTextBlock.Text = "Analysis Complete.";
+            Task.Delay(2000).ContinueWith(t =>
+            {
+                Dispatcher.Invoke(() =>
+                {
                     ProgressTextBlock.Visibility = Visibility.Collapsed;
                     ScanProgressBar.Visibility = Visibility.Collapsed;
                     StopScanButton.Visibility = Visibility.Collapsed;
                     ScanButton.Visibility = Visibility.Visible;
                 });
-                cts?.Dispose(); cts = null;
+            });
+        }
+
+        private void StopScanButton_Click(object sender, RoutedEventArgs e) => _cts?.Cancel();
+        #endregion
+
+        #region Analysis and Filtering
+        private string GenerateReport(long totalSize) =>
+            $"Scan Report - {DateTime.Now}\n" +
+            $"Directory: {DirectoryPathTextBox.Text}\n" +
+            $"Total Size: {FormatSize(totalSize)}\n" +
+            $"Total Files Found: {AllFiles?.Count ?? 0}\n" +
+            $"Duplicates Found: {Duplicates?.Count ?? 0}\n" +
+            $"Empty Folders Found: {EmptyFolders?.Count ?? 0}\n";
+
+        private void GetFileTypeStats(List<FileSystemNode> files, IProgress<FileTypeStats> progress, CancellationToken token)
+        {
+            if (files == null) return;
+
+            var stats = files.GroupBy(f => f.Extension)
+                 .Select(g => new FileTypeStats
+                 {
+                     Extension = string.IsNullOrEmpty(g.Key) ? "No Extension" : g.Key,
+                     TotalSize = g.Sum(f => f.Size),
+                     FileCount = g.Count()
+                 }).OrderByDescending(s => s.TotalSize);
+
+            foreach (var stat in stats)
+            {
+                if (token.IsCancellationRequested) return;
+                progress.Report(stat);
             }
         }
 
-        private List<FileSystemNode> FindEmptyFolders(FileSystemNode root)
+        private void GetFileAgeStats(List<FileSystemNode> files, IProgress<FileAgeStats> progress, CancellationToken token)
         {
-            return GetAllFiles(root)
-                .Where(node => node.IsDirectory && !node.Children.Any())
-                .ToList();
+            if (files == null) return;
+            var now = DateTime.Now;
+            var stats = new Dictionary<string, FileAgeStats>
+            {
+                { "Last Month", new FileAgeStats { Category = "Last Month" } },
+                { "Last Year", new FileAgeStats { Category = "Last Year" } },
+                { "Older Than 1 Year", new FileAgeStats { Category = "Older Than 1 Year" } }
+            };
+
+            foreach (var file in files)
+            {
+                if (token.IsCancellationRequested) return;
+                if (file.LastWriteTime >= now.AddMonths(-1))
+                {
+                    stats["Last Month"].AddFile(file.Size);
+                }
+                else if (file.LastWriteTime >= now.AddYears(-1))
+                {
+                    stats["Last Year"].AddFile(file.Size);
+                }
+                else
+                {
+                    stats["Older Than 1 Year"].AddFile(file.Size);
+                }
+            }
+
+            foreach (var stat in stats.Values.Where(s => s.FileCount > 0))
+            {
+                if (token.IsCancellationRequested) return;
+                progress.Report(stat);
+            }
         }
 
-        private async Task ResetUIState(string reportMessage) => await Dispatcher.InvokeAsync(() => ReportsTextBox.Text = reportMessage);
-
-        private void StopScanButton_Click(object sender, RoutedEventArgs e) { if (cts != null) { cts.Cancel(); StopScanButton.IsEnabled = false; } }
-
-        private void DateFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void FindDuplicates(List<FileSystemNode> files, IProgress<DuplicateSet> progress, CancellationToken token)
         {
-            if (DateFilterComboBox.SelectedItem is ComboBoxItem selectedItem)
+            if (files == null || files.Count < 2) return;
+
+            var filesBySize = new Dictionary<long, List<FileSystemNode>>();
+            foreach (var file in files)
             {
-                bool isCustomRange = selectedItem.Content.ToString() == "Custom Range";
-                if (StartDatePicker != null) StartDatePicker.Visibility = isCustomRange ? Visibility.Visible : Visibility.Collapsed;
-                if (EndDatePicker != null) EndDatePicker.Visibility = isCustomRange ? Visibility.Visible : Visibility.Collapsed;
+                if (token.IsCancellationRequested) return;
+                if (file.Size <= 4096) continue;
+
+                if (!filesBySize.TryGetValue(file.Size, out var list))
+                {
+                    list = new List<FileSystemNode>();
+                    filesBySize[file.Size] = list;
+                }
+                list.Add(file);
+            }
+
+            foreach (var sizeGroup in filesBySize.Values)
+            {
+                if (token.IsCancellationRequested) return;
+                if (sizeGroup.Count < 2) continue;
+
+                var filesByPartialHash = new Dictionary<string, List<FileSystemNode>>();
+                foreach (var file in sizeGroup)
+                {
+                    if (token.IsCancellationRequested) return;
+                    string partialHash = ComputePartialHash(file.FullPath);
+                    if (string.IsNullOrEmpty(partialHash)) continue;
+
+                    if (!filesByPartialHash.TryGetValue(partialHash, out var list))
+                    {
+                        list = new List<FileSystemNode>();
+                        filesByPartialHash[partialHash] = list;
+                    }
+                    list.Add(file);
+                }
+
+                foreach (var partialHashGroup in filesByPartialHash.Values)
+                {
+                    if (token.IsCancellationRequested) return;
+                    if (partialHashGroup.Count < 2) continue;
+
+                    var filesByFullHash = new Dictionary<string, List<FileSystemNode>>();
+                    foreach (var file in partialHashGroup)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        string fullHash = ComputeFastHash(file.FullPath);
+                        if (string.IsNullOrEmpty(fullHash)) continue;
+
+                        if (!filesByFullHash.TryGetValue(fullHash, out var list))
+                        {
+                            list = new List<FileSystemNode>();
+                            filesByFullHash[fullHash] = list;
+                        }
+                        list.Add(file);
+                    }
+
+                    foreach (var confirmedGroup in filesByFullHash.Values)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        if (confirmedGroup.Count > 1)
+                        {
+                            var duplicateSet = new DuplicateSet
+                            {
+                                FileName = Path.GetFileName(confirmedGroup.First().FullPath),
+                                Count = confirmedGroup.Count(),
+                                FormattedSize = FormatSize(confirmedGroup.First().Size * confirmedGroup.Count()),
+                                Icon = confirmedGroup.First().Icon,
+                                Files = new ObservableCollection<FileSystemNode>(confirmedGroup)
+                            };
+                            progress.Report(duplicateSet);
+                        }
+                    }
+                }
+            }
+        }
+
+        private string ComputePartialHash(string filePath, int bytesToRead = 4096)
+        {
+            try
+            {
+                using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (stream.Length == 0) return "EMPTY";
+
+                if (stream.Length < bytesToRead) return ComputeFastHash(filePath);
+
+                byte[] buffer = new byte[bytesToRead];
+                int bytesRead = stream.Read(buffer, 0, bytesToRead);
+
+                var hasher = new System.IO.Hashing.XxHash64();
+                hasher.Append(new ReadOnlySpan<byte>(buffer, 0, bytesRead));
+                byte[] hash = hasher.GetHashAndReset();
+                return BitConverter.ToString(hash).Replace("-", "");
+            }
+            catch (Exception ex)
+            {
+                _scanErrors.AppendLine($"Could not perform partial hash on file {filePath}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private void FindEmptyFolders(FileSystemNode root, IProgress<FileSystemNode> progress, CancellationToken token)
+        {
+            if (root == null) return;
+            var stack = new Stack<FileSystemNode>();
+            stack.Push(root);
+            while (stack.Count > 0)
+            {
+                if (token.IsCancellationRequested) return;
+                var current = stack.Pop();
+                if (current.IsDirectory && !current.Children.Any())
+                {
+                    progress.Report(current);
+                }
+
+                if (current.Children == null) continue;
+                foreach (var child in current.Children.Reverse())
+                {
+                    stack.Push(child);
+                }
             }
         }
 
         private void ApplyFilters_Click(object sender, RoutedEventArgs e)
         {
-            if (allFiles == null) return;
-            selectedFiles = ApplyFilters(allFiles);
-            ResultsDataGrid.ItemsSource = null;
-            ResultsDataGrid.ItemsSource = selectedFiles;
-        }
-
-        #region Context Menu and Button Click Handlers
-        private void OpenFolder_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as MenuItem)?.DataContext is FileSystemNode node)
+            if (AllFiles == null) return;
+            SelectedFiles.Clear();
+            var filtered = ApplyFilters(AllFiles);
+            foreach (var file in filtered)
             {
-                try
-                {
-                    if (Directory.Exists(node.FullPath) || File.Exists(node.FullPath))
-                    {
-                        Process.Start("explorer.exe", $"/select,\"{node.FullPath}\"");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Could not open folder: {ex.Message}");
-                }
+                SelectedFiles.Add(file);
             }
         }
 
-        private async void Delete_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as MenuItem)?.DataContext is FileSystemNode node)
-            {
-                await DeleteFileAsync(node);
-            }
-        }
-
-        private void HelpButton_Click(object sender, RoutedEventArgs e)
-        {
-            var helpWindow = new HelpWindow
-            {
-                Owner = this
-            };
-            helpWindow.ShowDialog();
-        }
-
-        private void AboutButton_Click(object sender, RoutedEventArgs e)
-        {
-            var aboutWindow = new AboutWindow
-            {
-                Owner = this
-            };
-            aboutWindow.ShowDialog();
-        }
-        #endregion
-
-        private void SortAllNodesBySize(FileSystemNode node)
-        {
-            if (!node.IsDirectory || node.Children == null || node.Children.Count == 0) return;
-
-            var sortedChildren = node.Children.OrderByDescending(c => c.Size).ToList();
-            node.Children.Clear();
-            foreach (var child in sortedChildren)
-            {
-                node.Children.Add(child);
-                SortAllNodesBySize(child);
-            }
-        }
-
-        private string FormatSize(long bytes)
-        {
-            if (bytes < 0) return "0 bytes";
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            int order = 0;
-            double size = bytes;
-            while (size >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                size /= 1024;
-            }
-            return $"{size:0.##} {sizes[order]}";
-        }
-
-        private void BrowseButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new OpenFolderDialog { Title = "Select a folder to scan" };
-            if (dialog.ShowDialog() == true)
-            {
-                DirectoryPathTextBox.Text = dialog.FolderName;
-            }
-        }
-
-        private async void ExportButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (selectedFiles == null || !selectedFiles.Any())
-            {
-                MessageBox.Show("No data to export.");
-                return;
-            }
-            string csvPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "file_size_report.csv");
-            await Task.Run(() => CsvExporter.ExportToCsv(selectedFiles, csvPath));
-            MessageBox.Show($"Exported to {csvPath}");
-        }
-
-        private async Task DeleteFileAsync(FileSystemNode file)
-        {
-            string message = file.IsDirectory
-                ? $"Are you sure you want to move the folder '{System.IO.Path.GetFileName(file.FullPath)}' and all its contents to the Recycle Bin?"
-                : $"Are you sure you want to move '{System.IO.Path.GetFileName(file.FullPath)}' to the Recycle Bin?";
-
-            var result = MessageBox.Show(message, "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                try
-                {
-                    await Task.Run(() => {
-                        if (file.IsDirectory)
-                        {
-                            FileSystem.DeleteDirectory(file.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                        }
-                        else
-                        {
-                            FileSystem.DeleteFile(file.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                        }
-                    });
-
-                    MessageBox.Show("Item(s) moved to Recycle Bin.");
-
-                    allFiles?.RemoveAll(f => f.FullPath.StartsWith(file.FullPath, StringComparison.OrdinalIgnoreCase));
-                    selectedFiles?.RemoveAll(f => f.FullPath.StartsWith(file.FullPath, StringComparison.OrdinalIgnoreCase));
-                    duplicates?.RemoveAll(d => d.Files.Any(f => f.FullPath.StartsWith(file.FullPath, StringComparison.OrdinalIgnoreCase)));
-                    largestFiles?.RemoveAll(f => f.FullPath.StartsWith(file.FullPath, StringComparison.OrdinalIgnoreCase));
-                    emptyFolders?.RemoveAll(f => f.FullPath.StartsWith(file.FullPath, StringComparison.OrdinalIgnoreCase));
-                    file.Parent?.Children.Remove(file);
-
-                    if (allFiles != null)
-                    {
-                        fileTypes = GetFileTypeStats();
-                        fileAgeStats = GetFileAgeStats();
-                        var scanner = new DirectoryScanner(null, scanErrors);
-                        scanner.UpdateAllSizesAndFormatting(rootNode);
-
-                        Dispatcher.Invoke(() => {
-                            ResultsDataGrid.ItemsSource = null;
-                            ResultsDataGrid.ItemsSource = selectedFiles;
-                            DuplicatesTreeView.ItemsSource = null;
-                            DuplicatesTreeView.ItemsSource = duplicates;
-                            FileTypesDataGrid.ItemsSource = null;
-                            FileTypesDataGrid.ItemsSource = fileTypes;
-                            FileAgeDataGrid.ItemsSource = null;
-                            FileAgeDataGrid.ItemsSource = fileAgeStats;
-                            LargestFilesDataGrid.ItemsSource = null;
-                            LargestFilesDataGrid.ItemsSource = largestFiles;
-                            EmptyFoldersDataGrid.ItemsSource = null;
-                            EmptyFoldersDataGrid.ItemsSource = emptyFolders;
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error moving item to Recycle Bin: {ex.Message}");
-                }
-            }
-        }
-
-        #region UI Event Handlers
-        private async void ResultsDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { if (ResultsDataGrid.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf); }
-        private async void DuplicatesTreeView_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { if (DuplicatesTreeView.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf); }
-        private async void ScanHistoryDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) { if (ScanHistoryDataGrid.SelectedItem is ScanHistoryEntry se) { DirectoryPathTextBox.Text = se.Path; await Dispatcher.InvokeAsync(() => ScanButton_Click(null, null)); } }
-        private async void ResultsDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (ResultsDataGrid.SelectedItem is FileSystemNode sf) await PreviewFileAsync(sf); }
-        #endregion
-
-        private async Task PreviewFileAsync(FileSystemNode file)
-        {
-            PreviewImage.Visibility = Visibility.Collapsed;
-            PreviewTextBox.Visibility = Visibility.Collapsed;
-            PreviewMessage.Text = "";
-
-            try
-            {
-                if (file.Extension.Equals(".txt", StringComparison.OrdinalIgnoreCase))
-                {
-                    string content = await Task.Run(() => File.ReadAllText(file.FullPath));
-                    PreviewTextBox.Text = content;
-                    PreviewTextBox.Visibility = Visibility.Visible;
-                }
-                else if (new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" }.Contains(file.Extension, StringComparer.OrdinalIgnoreCase))
-                {
-                    BitmapImage bitmap = new BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.UriSource = new Uri(file.FullPath);
-                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmap.EndInit();
-                    PreviewImage.Source = bitmap;
-                    PreviewImage.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    PreviewMessage.Text = "Preview not supported for this file type.";
-                }
-            }
-            catch (Exception ex)
-            {
-                PreviewMessage.Text = $"Error previewing file: {ex.Message}";
-            }
-        }
-
-        #region Analysis and Reporting
-        private string GenerateReport(long totalSize)
-        {
-            return $"Scan Report - {DateTime.Now}\n" +
-                   $"Directory: {DirectoryPathTextBox.Text}\n" +
-                   $"Total Size: {FormatSize(totalSize)}\n" +
-                   $"Total Files Found: {allFiles?.Count ?? 0}\n" +
-                   $"Duplicates Found: {duplicates?.Count ?? 0}\n" +
-                   $"Empty Folders Found: {emptyFolders?.Count ?? 0}\n";
-        }
-
-        private List<FileSystemNode> GetTopFiles(FileSystemNode root, int count) => GetAllFiles(root).Where(f => !f.IsDirectory).OrderByDescending(f => f.Size).Take(count).ToList();
-
-        private List<FileSystemNode> ApplyFilters(IEnumerable<FileSystemNode> files)
+        private IEnumerable<FileSystemNode> ApplyFilters(IEnumerable<FileSystemNode> files)
         {
             var filteredFiles = files;
             if (SizeFilterComboBox.SelectedItem is ComboBoxItem sizeItem && sizeItem.Content.ToString() != "All Sizes")
@@ -445,10 +569,8 @@ namespace FileSizeAnalyzerGUI
                 filteredFiles = filteredFiles.Where(f => f.Size >= minSize);
             }
 
-            string[] extensionsToFilter = ExtensionFilterTextBox.Text
-                .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(ext => ext.Trim().Replace("*", ""))
-                .ToArray();
+            string[] extensionsToFilter = ExtensionFilterTextBox.Text.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(ext => ext.Trim().Replace("*", "")).ToArray();
             if (extensionsToFilter.Any())
             {
                 filteredFiles = filteredFiles.Where(f => extensionsToFilter.Contains(f.Extension, StringComparer.OrdinalIgnoreCase));
@@ -467,79 +589,161 @@ namespace FileSizeAnalyzerGUI
                     _ => filteredFiles
                 };
             }
-
-            return filteredFiles.ToList();
+            return filteredFiles;
         }
+        #endregion
 
-        private List<DuplicateSet> FindDuplicates(List<FileSystemNode> files)
+        #region UI Handlers
+        private void DateFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (files == null) return new List<DuplicateSet>();
-
-            return files.Where(f => f.Size > 0)
-                .GroupBy(f => f.Size)
-                .Where(g => g.Count() > 1)
-                .SelectMany(g => g.GroupBy(f => ComputeFastHash(f.FullPath)))
-                .Where(hg => hg.Count() > 1)
-                .Select(hg => new DuplicateSet
-                {
-                    FileName = System.IO.Path.GetFileName(hg.First().FullPath),
-                    Count = hg.Count(),
-                    FormattedSize = FormatSize(hg.First().Size * hg.Count()),
-                    Icon = hg.First().Icon,
-                    Files = new ObservableCollection<FileSystemNode>(hg)
-                })
-                .OrderByDescending(ds => ds.Files.Sum(f => f.Size))
-                .ToList();
-        }
-
-        private List<FileTypeStats> GetFileTypeStats()
-        {
-            if (allFiles == null) return new List<FileTypeStats>();
-            return allFiles.GroupBy(f => f.Extension)
-                           .Select(g => new FileTypeStats
-                           {
-                               Extension = string.IsNullOrEmpty(g.Key) ? "No Extension" : g.Key,
-                               TotalSize = g.Sum(f => f.Size),
-                               FileCount = g.Count()
-                           }).OrderByDescending(s => s.TotalSize).ToList();
-        }
-
-        private List<FileAgeStats> GetFileAgeStats()
-        {
-            if (allFiles == null) return new List<FileAgeStats>();
-            var now = DateTime.Now;
-            var stats = new List<FileAgeStats>
+            if (DateFilterComboBox.SelectedItem is ComboBoxItem selectedItem)
             {
-                new FileAgeStats { Category = "Last Month" },
-                new FileAgeStats { Category = "Last Year" },
-                new FileAgeStats { Category = "Older Than 1 Year" }
-            };
-            foreach (var file in allFiles)
-            {
-                if (file.LastWriteTime >= now.AddMonths(-1)) stats[0].AddFile(file.Size);
-                else if (file.LastWriteTime >= now.AddYears(-1)) stats[1].AddFile(file.Size);
-                else stats[2].AddFile(file.Size);
+                bool isCustomRange = selectedItem.Content.ToString() == "Custom Range";
+                if (StartDatePicker != null) StartDatePicker.Visibility = isCustomRange ? Visibility.Visible : Visibility.Collapsed;
+                if (EndDatePicker != null) EndDatePicker.Visibility = isCustomRange ? Visibility.Visible : Visibility.Collapsed;
             }
-            return stats.Where(s => s.FileCount > 0).ToList();
+        }
+
+        private void BrowseButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFolderDialog { Title = "Select a folder to scan" };
+            if (dialog.ShowDialog() == true)
+            {
+                DirectoryPathTextBox.Text = dialog.FolderName;
+            }
+        }
+
+        private async void ExportButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectedFiles == null || !SelectedFiles.Any())
+            {
+                MessageBox.Show("No data to export.");
+                return;
+            }
+            string csvPath = Path.Combine(Directory.GetCurrentDirectory(), "file_size_report.csv");
+            await Task.Run(() => CsvExporter.ExportToCsv(SelectedFiles.ToList(), csvPath));
+            MessageBox.Show($"Exported to {csvPath}");
+        }
+
+        private void HelpButton_Click(object sender, RoutedEventArgs e) => new HelpWindow { Owner = this }.ShowDialog();
+        private void AboutButton_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
+
+        private void OpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is FileSystemNode node)
+            {
+                try
+                {
+                    if (Directory.Exists(node.FullPath) || File.Exists(node.FullPath))
+                    {
+                        Process.Start("explorer.exe", $"/select,\"{node.FullPath}\"");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Could not open folder: {ex.Message}");
+                }
+            }
+        }
+
+        private async void Delete_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is FileSystemNode node)
+            {
+                await DeleteFileAsync(node);
+            }
+        }
+
+        private async Task DeleteFileAsync(FileSystemNode file)
+        {
+            string message = file.IsDirectory
+                ? $"Are you sure you want to move the folder '{Path.GetFileName(file.FullPath)}' and all its contents to the Recycle Bin?"
+                : $"Are you sure you want to move '{Path.GetFileName(file.FullPath)}' to the Recycle Bin?";
+
+            if (MessageBox.Show(message, "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    await Task.Run(() =>
+                    {
+                        if (file.IsDirectory) FileSystem.DeleteDirectory(file.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                        else FileSystem.DeleteFile(file.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                    });
+                    MessageBox.Show("Item(s) moved to Recycle Bin.");
+                    ScanButton_Click(null, null); // Rescan to refresh data
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error moving item to Recycle Bin: {ex.Message}");
+                }
+            }
+        }
+
+        private async void ResultsDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) { if (ResultsDataGrid.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf); }
+        private async void DuplicatesTreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e) { if (DuplicatesTreeView.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf); }
+        private void ScanHistoryDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) { if (ScanHistoryDataGrid.SelectedItem is ScanHistoryEntry se) { DirectoryPathTextBox.Text = se.Path; ScanButton_Click(null, null); } }
+        private async void ResultsDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (ResultsDataGrid.SelectedItem is FileSystemNode sf) await PreviewFileAsync(sf); }
+
+        private async Task PreviewFileAsync(FileSystemNode file)
+        {
+            if (file == null) return;
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewTextBox.Visibility = Visibility.Collapsed;
+            PreviewMessage.Text = "";
+
+            PreviewTextBox.FontFamily = new FontFamily("Consolas");
+
+            try
+            {
+                if (file.IsDirectory)
+                {
+                    PreviewMessage.Text = "Select a file to preview.";
+                    return;
+                }
+
+                string[] textExtensions = { ".txt", ".log", ".xml", ".cs", ".xaml", ".json", ".config", ".md", ".py", ".js" };
+                string[] imageExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
+
+                if (textExtensions.Contains(file.Extension, StringComparer.OrdinalIgnoreCase))
+                {
+                    using var reader = new StreamReader(file.FullPath);
+                    char[] buffer = new char[4096];
+                    int charsRead = await reader.ReadAsync(buffer, 0, buffer.Length);
+                    PreviewTextBox.Text = new string(buffer, 0, charsRead);
+                    PreviewTextBox.Visibility = Visibility.Visible;
+                }
+                else if (imageExtensions.Contains(file.Extension, StringComparer.OrdinalIgnoreCase))
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(file.FullPath);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    PreviewImage.Source = bitmap;
+                    PreviewImage.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    PreviewMessage.Text = $"Preview not supported for '{file.Extension}' files.";
+                }
+            }
+            catch (Exception ex)
+            {
+                PreviewMessage.Text = $"Error previewing file: {ex.Message}";
+            }
         }
         #endregion
 
         #region Treemap and Visualization
-        private void DirectoryTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        {
-            DrawTreemap();
-        }
-
+        private void DirectoryTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e) => DrawTreemap();
         private void TreemapCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => DrawTreemap();
 
         private void DrawTreemap()
         {
             TreemapCanvas.Children.Clear();
-            FileSystemNode currentNode = (DirectoryTreeView.SelectedItem as FileSystemNode) ?? rootNode;
-            if (currentNode == null || !currentNode.IsDirectory)
-            {
-                currentNode = currentNode?.Parent ?? rootNode;
-            }
+            FileSystemNode currentNode = (DirectoryTreeView.SelectedItem as FileSystemNode) ?? RootNodes.FirstOrDefault();
+            if (currentNode == null) return;
+            if (!currentNode.IsDirectory) currentNode = currentNode.Parent;
             if (currentNode == null) return;
 
             var nodesToDraw = currentNode.Children.Where(n => n.Size > 0).ToList();
@@ -547,7 +751,6 @@ namespace FileSizeAnalyzerGUI
 
             var totalSize = (double)nodesToDraw.Sum(n => n.Size);
             var bounds = new Rect(0, 0, TreemapCanvas.ActualWidth, TreemapCanvas.ActualHeight);
-
             RenderTreemapNodes(nodesToDraw, bounds, totalSize);
         }
 
@@ -557,11 +760,9 @@ namespace FileSizeAnalyzerGUI
 
             var node = nodes.First();
             var remainingNodes = nodes.Skip(1).ToList();
+            double nodeArea = (node.Size / totalSize) * (bounds.Width * bounds.Height);
 
-            double nodeArea = (node.Size / totalSize) * bounds.Width * bounds.Height;
-            Rect nodeRect;
-            Rect remainingBounds;
-
+            Rect nodeRect, remainingBounds;
             if (bounds.Width > bounds.Height)
             {
                 double nodeWidth = Math.Min(bounds.Width, node.Size > 0 ? nodeArea / bounds.Height : 0);
@@ -588,19 +789,17 @@ namespace FileSizeAnalyzerGUI
 
             if (border.Width > 30 && border.Height > 15)
             {
-                var textBlock = new TextBlock
+                border.Child = new TextBlock
                 {
-                    Text = System.IO.Path.GetFileName(node.FullPath),
+                    Text = Path.GetFileName(node.FullPath),
                     Foreground = Brushes.White,
                     Margin = new Thickness(2),
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     IsHitTestVisible = false
                 };
-                border.Child = textBlock;
             }
 
             border.MouseLeftButtonDown += (s, e) => TreemapRectangle_Click(node);
-
             Canvas.SetLeft(border, nodeRect.Left);
             Canvas.SetTop(border, nodeRect.Top);
             TreemapCanvas.Children.Add(border);
@@ -614,44 +813,26 @@ namespace FileSizeAnalyzerGUI
         private void TreemapRectangle_Click(FileSystemNode node)
         {
             var nodeToSelect = node.IsDirectory ? node : node.Parent;
-
-            if (nodeToSelect != null)
+            if (nodeToSelect != null && MainTabControl.Items.OfType<TabItem>().FirstOrDefault(t => t.Header.ToString() == "Directory Tree") is TabItem treeViewTab)
             {
-                if (FindName("MainTabControl") is TabControl tabControl)
-                {
-                    var treeViewTab = tabControl.Items.OfType<TabItem>().FirstOrDefault(t => t.Header.ToString() == "Directory Tree");
-                    if (treeViewTab != null)
-                    {
-                        tabControl.SelectedItem = treeViewTab;
-                        Dispatcher.InvokeAsync(() => SelectTreeViewItem(nodeToSelect));
-                    }
-                }
+                MainTabControl.SelectedItem = treeViewTab;
+                Dispatcher.InvokeAsync(() => SelectTreeViewItem(nodeToSelect));
             }
         }
 
         private void SelectTreeViewItem(FileSystemNode node)
         {
             var pathStack = new Stack<FileSystemNode>();
-            var current = node;
-            while (current != null)
+            for (var current = node; current != null; current = current.Parent)
             {
                 pathStack.Push(current);
-                current = current.Parent;
             }
 
             ItemsControl parentContainer = DirectoryTreeView;
             while (pathStack.Count > 0)
             {
                 var itemToFind = pathStack.Pop();
-                var currentContainer = parentContainer.ItemContainerGenerator.ContainerFromItem(itemToFind) as TreeViewItem;
-
-                if (currentContainer == null)
-                {
-                    parentContainer.UpdateLayout();
-                    currentContainer = parentContainer.ItemContainerGenerator.ContainerFromItem(itemToFind) as TreeViewItem;
-                }
-
-                if (currentContainer != null)
+                if (parentContainer.ItemContainerGenerator.ContainerFromItem(itemToFind) is TreeViewItem currentContainer)
                 {
                     if (pathStack.Count > 0)
                     {
@@ -666,18 +847,30 @@ namespace FileSizeAnalyzerGUI
                 }
                 else
                 {
-                    break;
+                    parentContainer.UpdateLayout();
+                    if (parentContainer.ItemContainerGenerator.ContainerFromItem(itemToFind) is TreeViewItem retryContainer)
+                    {
+                        if (pathStack.Count > 0)
+                        {
+                            retryContainer.IsExpanded = true;
+                            parentContainer = retryContainer;
+                        }
+                        else
+                        {
+                            retryContainer.IsSelected = true;
+                            retryContainer.BringIntoView();
+                        }
+                    }
+                    else break;
                 }
             }
         }
+        #endregion
 
-        private Color GetRandomColor()
-        {
-            var random = new Random(Guid.NewGuid().GetHashCode());
-            return Color.FromRgb((byte)random.Next(100, 220), (byte)random.Next(100, 220), (byte)random.Next(100, 220));
-        }
+        #region Utility Methods
+        private Color GetRandomColor() => Color.FromRgb((byte)new Random().Next(100, 220), (byte)new Random().Next(100, 220), (byte)new Random().Next(100, 220));
 
-        private IEnumerable<FileSystemNode> GetAllFiles(FileSystemNode node)
+        private IEnumerable<FileSystemNode> GetAllNodes(FileSystemNode node)
         {
             if (node == null) yield break;
             var stack = new Stack<FileSystemNode>();
@@ -686,37 +879,89 @@ namespace FileSizeAnalyzerGUI
             {
                 var current = stack.Pop();
                 yield return current;
-                foreach (var child in current.Children)
-                {
-                    stack.Push(child);
-                }
+                if (current.Children == null) continue;
+                foreach (var child in current.Children) stack.Push(child);
             }
         }
-        #endregion
+
+        private string FormatSize(long bytes)
+        {
+            if (bytes < 0) return "0 bytes";
+            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            int order = 0;
+            double size = bytes;
+            while (size >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                size /= 1024;
+            }
+            return $"{size:0.##} {sizes[order]}";
+        }
 
         private string ComputeFastHash(string filePath)
         {
             try
             {
-                const int bufferSize = 4096;
-                using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize);
+                using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 if (stream.Length == 0) return "EMPTY";
-
                 var hasher = new System.IO.Hashing.XxHash64();
                 hasher.Append(stream);
                 byte[] hash = hasher.GetHashAndReset();
                 return BitConverter.ToString(hash).Replace("-", "");
             }
-            catch (IOException ex)
-            {
-                scanErrors.AppendLine($"Could not hash file {filePath}: {ex.Message}");
-                return Guid.NewGuid().ToString();
-            }
             catch (Exception ex)
             {
-                scanErrors.AppendLine($"An unexpected error occurred while hashing {filePath}: {ex.Message}");
+                _scanErrors.AppendLine($"Could not hash file {filePath}: {ex.Message}");
                 return Guid.NewGuid().ToString();
             }
         }
+
+        public void UpdateAllSizesAndFormatting(FileSystemNode node)
+        {
+            if (node == null) return;
+            if (node.IsDirectory)
+            {
+                long totalSize = 0;
+                foreach (var child in node.Children)
+                {
+                    UpdateAllSizesAndFormatting(child);
+                    totalSize += child.Size;
+                }
+                node.Size = totalSize;
+            }
+            node.FormattedSize = FormatSize(node.Size);
+        }
+
+        public void UpdateBarWidths(FileSystemNode node, double maxBarWidth = 200.0)
+        {
+            if (node == null || !node.IsDirectory) return;
+
+            foreach (var child in node.Children)
+            {
+                if (node.Size > 0)
+                {
+                    child.BarWidth = (child.Size / (double)node.Size) * maxBarWidth;
+                    child.BarFill = GetRandomColor();
+                }
+                if (child.IsDirectory)
+                {
+                    UpdateBarWidths(child, maxBarWidth);
+                }
+            }
+        }
+
+        public void SortAllNodesBySize(FileSystemNode node)
+        {
+            if (node == null || !node.IsDirectory || node.Children == null || node.Children.Count == 0) return;
+
+            var sortedChildren = new ObservableCollection<FileSystemNode>(node.Children.OrderByDescending(c => c.Size));
+            node.Children.Clear();
+            foreach (var child in sortedChildren)
+            {
+                node.Children.Add(child);
+                SortAllNodesBySize(child);
+            }
+        }
+        #endregion
     }
 }

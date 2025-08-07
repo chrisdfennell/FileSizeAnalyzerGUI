@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -7,6 +6,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace FileSizeAnalyzerGUI
 {
@@ -15,12 +15,11 @@ namespace FileSizeAnalyzerGUI
         public string FullPath { get; set; }
         public long Size { get; set; }
         public bool IsDirectory { get; set; }
-        public ObservableCollection<FileSystemNode> Children { get; set; }
+        public ObservableCollection<FileSystemNode> Children { get; set; } = new ObservableCollection<FileSystemNode>();
         public FileSystemNode Parent { get; set; }
         public DateTime CreationTime { get; set; }
         public DateTime LastWriteTime { get; set; }
-        public string Extension { get; set; }
-        public int DuplicateCount { get; set; }
+        public string Extension => IsDirectory ? "" : Path.GetExtension(FullPath)?.ToLower();
         public Color BarFill { get; set; }
         public string FormattedSize { get; set; }
         public ImageSource Icon { get; set; }
@@ -39,19 +38,13 @@ namespace FileSizeAnalyzerGUI
         }
     }
 
-    // NEW CLASS for grouping duplicates
     public class DuplicateSet
     {
         public string FileName { get; set; }
         public int Count { get; set; }
         public string FormattedSize { get; set; }
         public ImageSource Icon { get; set; }
-        public ObservableCollection<FileSystemNode> Files { get; set; }
-
-        public DuplicateSet()
-        {
-            Files = new ObservableCollection<FileSystemNode>();
-        }
+        public ObservableCollection<FileSystemNode> Files { get; set; } = new ObservableCollection<FileSystemNode>();
     }
 
     public class ColorToBrushConverter : IValueConverter
@@ -65,10 +58,7 @@ namespace FileSizeAnalyzerGUI
             return Brushes.Transparent;
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
-        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
     public class FormatSizeConverter : IValueConverter
@@ -91,27 +81,21 @@ namespace FileSizeAnalyzerGUI
             return "0 B";
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
-        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
     public class PathToNameConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is string path)
+            if (value is string path && !string.IsNullOrEmpty(path))
             {
                 return Path.GetFileName(path);
             }
             return value;
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
-        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
     public class FileTypeStats

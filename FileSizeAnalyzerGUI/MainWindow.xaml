@@ -16,22 +16,11 @@
         <local:PathToNameConverter x:Key="PathToNameConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
 
-        <!-- Colors -->
-        <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF2D2D30"/>
-        <SolidColorBrush x:Key="BorderBrush" Color="#FF434346"/>
-        <SolidColorBrush x:Key="TextBrush" Color="#FFE0E0E0"/>
-        <SolidColorBrush x:Key="GlyphBrush" Color="#FFCCCCCC"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#FF007ACC"/>
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF009AFB"/>
-        <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FF3F3F46"/>
-        <SolidColorBrush x:Key="ControlHoverBrush" Color="#FF525257"/>
-        <SolidColorBrush x:Key="ControlPressedBrush" Color="#FF005A9E"/>
-
         <!-- Base Button Style -->
         <Style TargetType="{x:Type Button}">
-            <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -46,24 +35,24 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource ControlHoverBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{StaticResource ControlPressedBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ControlPressedBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- Primary Action Button Style -->
         <Style x:Key="PrimaryActionButton" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Foreground" Value="White"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{StaticResource ControlPressedBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ControlPressedBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -74,7 +63,7 @@
             <Setter Property="Height" Value="32"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="{StaticResource GlyphBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource GlyphBrush}"/>
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
@@ -88,7 +77,7 @@
             </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource ControlHoverBrush}"/>
+                    <Setter Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -103,76 +92,58 @@
         </Style>
 
         <!-- ComboBox Style -->
+        <Style TargetType="{x:Type ComboBoxItem}">
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ComboBoxItemHoverBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style TargetType="{x:Type ComboBox}">
-            <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
             <Setter Property="Padding" Value="4,3"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                    <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <ToggleButton x:Name="ToggleButton"
-                                          Background="{StaticResource ControlBackgroundBrush}"
-                                          BorderBrush="{StaticResource BorderBrush}"
-                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                          ClickMode="Press">
-                                <ToggleButton.Content>
-                                    <Path Data="M 0 0 L 4 4 L 8 0 Z"
-                                          Fill="{StaticResource TextBrush}"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
-                                </ToggleButton.Content>
+                            <ToggleButton x:Name="ToggleButton" Focusable="false" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" >
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0" IsHitTestVisible="False" Margin="{TemplateBinding Padding}"
+                                                      Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                    <Path Grid.Column="1" x:Name="Arrow" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{DynamicResource GlyphBrush}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                </Grid>
                             </ToggleButton>
-                            <ContentPresenter x:Name="ContentSite"
-                                              IsHitTestVisible="False"
-                                              Content="{TemplateBinding SelectionBoxItem}"
-                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                              Margin="3,3,23,3"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Left"/>
-                            <TextBox x:Name="PART_EditableTextBox"
-                                     Style="{x:Null}"
-                                     Background="{StaticResource ControlBackgroundBrush}"
-                                     Foreground="{StaticResource TextBrush}"
-                                     BorderBrush="{StaticResource BorderBrush}"
-                                     Visibility="Hidden"
-                                     IsReadOnly="{TemplateBinding IsReadOnly}"
-                                     Margin="3,3,23,3"
-                                     VerticalAlignment="Center"/>
-                            <Popup x:Name="Popup"
-                                   Placement="Bottom"
-                                   IsOpen="{TemplateBinding IsDropDownOpen}"
-                                   AllowsTransparency="True"
-                                   Focusable="False"
-                                   PopupAnimation="Slide">
-                                <Grid x:Name="DropDown"
-                                      SnapsToDevicePixels="True"
-                                      MinWidth="{TemplateBinding ActualWidth}"
-                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border x:Name="DropDownBorder"
-                                            Background="{StaticResource ControlBackgroundBrush}"
-                                            BorderThickness="1"
-                                            BorderBrush="{StaticResource BorderBrush}"/>
-                                    <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                            <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid x:Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder" Background="{DynamicResource ComboBoxPopupBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"/>
+                                    <ScrollViewer Margin="4,6,4,6">
+                                        <StackPanel IsItemsHost="True" />
                                     </ScrollViewer>
                                 </Grid>
                             </Popup>
                         </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsEditable" Value="True">
-                                <Setter Property="Visibility" TargetName="PART_EditableTextBox" Value="Visible"/>
-                                <Setter Property="Content" TargetName="ContentSite" Value=""/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="{StaticResource GlyphBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True" SourceName="ToggleButton">
-                                <Setter Property="Background" TargetName="ToggleButton" Value="{StaticResource ControlHoverBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -180,10 +151,10 @@
 
         <!-- TextBox Style -->
         <Style TargetType="{x:Type TextBox}">
-            <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}"/>
             <Setter Property="Padding" Value="4,3"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
@@ -195,7 +166,7 @@
         </Style>
         <Style TargetType="{x:Type TabItem}">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource GlyphBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource GlyphBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Template">
@@ -208,12 +179,12 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                 <Setter TargetName="Border" Property="BorderThickness" Value="0,0,0,2" />
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -228,7 +199,7 @@
         </ContextMenu>
     </Window.Resources>
 
-    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="{StaticResource WindowBackgroundBrush}">
+    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource WindowBackgroundBrush}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -237,8 +208,8 @@
 
             <Grid Grid.Row="0" Height="32" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0">
-                    <Image Source="pack://application:,,,/FileSizeAnalyzerGUI;component/assets/icon.ico" Width="16" Height="16"/>
-                    <TextBlock Text="FileSizeAnalyzer Pro" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" Margin="5,0"/>
+                    <Image Source="/assets/icon.ico" Width="16" Height="16"/>
+                    <TextBlock Text="FileSizeAnalyzer Pro" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Margin="5,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="" Click="Minimize_Click" Style="{StaticResource TitleBarButton}"/>
@@ -255,38 +226,65 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="5">
-                    <StackPanel Orientation="Horizontal" Margin="5">
-                        <ComboBox x:Name="DriveSelectionComboBox" Width="60" Margin="5" SelectionChanged="DriveSelectionComboBox_SelectionChanged" VerticalContentAlignment="Center"/>
-                        <TextBox x:Name="DirectoryPathTextBox" Width="140" Margin="5"/>
-                        <Button Content="Browse" Click="BrowseButton_Click" Width="70" Margin="5"/>
-                        <Grid Width="120" Margin="5">
-                            <TextBlock Text="e.g., .jpg, .zip" Foreground="Gray" IsHitTestVisible="False" VerticalAlignment="Center" Margin="5,0" Visibility="{Binding Text.IsEmpty, ElementName=ExtensionFilterTextBox, Converter={StaticResource BoolToVisConverter}}"/>
-                            <TextBox x:Name="ExtensionFilterTextBox" Background="Transparent"/>
+                <Border Grid.Row="0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- #################################################################### -->
+                        <!-- ## LAYOUT FIX: Using a Grid with two rows for precise control.      ## -->
+                        <!-- #################################################################### -->
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Top row contains all the main filter controls -->
+                            <WrapPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ComboBox x:Name="DriveSelectionComboBox" Width="60" Margin="0,0,5,5" SelectionChanged="DriveSelectionComboBox_SelectionChanged" VerticalContentAlignment="Center"/>
+                                <TextBox x:Name="DirectoryPathTextBox" MinWidth="250" Margin="0,0,5,5"/>
+                                <Button Content="Browse" Click="BrowseButton_Click" Width="70" Margin="0,0,15,5"/>
+                                <Grid Width="120" Margin="0,0,5,5">
+                                    <TextBlock Text="e.g., .jpg, .zip" Foreground="Gray" IsHitTestVisible="False" VerticalAlignment="Center" Margin="5,0" Visibility="{Binding Text.IsEmpty, ElementName=ExtensionFilterTextBox, Converter={StaticResource BoolToVisConverter}}"/>
+                                    <TextBox x:Name="ExtensionFilterTextBox" Background="Transparent"/>
+                                </Grid>
+                                <ComboBox x:Name="SizeFilterComboBox" Width="100" Margin="0,0,5,5" SelectedIndex="0">
+                                    <ComboBoxItem Content="All Sizes"/>
+                                    <ComboBoxItem Content="> 1MB"/>
+                                    <ComboBoxItem Content="> 10MB"/>
+                                    <ComboBoxItem Content="> 100MB"/>
+                                    <ComboBoxItem Content="> 500MB"/>
+                                    <ComboBoxItem Content="> 1GB"/>
+                                    <ComboBoxItem Content="> 5GB"/>
+                                    <ComboBoxItem Content="> 10GB"/>
+                                </ComboBox>
+                                <ComboBox x:Name="DateFilterComboBox" Width="120" Margin="0,0,5,5" SelectedIndex="0" SelectionChanged="DateFilterComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="All Dates"/>
+                                    <ComboBoxItem Content="Last Month"/>
+                                    <ComboBoxItem Content="Last Year"/>
+                                    <ComboBoxItem Content="Older Than 1 Year"/>
+                                    <ComboBoxItem Content="Custom Range"/>
+                                </ComboBox>
+                                <DatePicker x:Name="StartDatePicker" Width="100" Margin="0,0,5,5" Visibility="Collapsed"/>
+                                <DatePicker x:Name="EndDatePicker" Width="100" Margin="0,0,5,5" Visibility="Collapsed"/>
+                            </WrapPanel>
+
+                            <!-- Bottom row contains the checkboxes, ensuring they are on a new line -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,5,0,0">
+                                <CheckBox x:Name="SkipSystemFilesCheckBox" Content="Skip System Files" IsChecked="True" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <CheckBox x:Name="SkipWindowsDirCheckBox" Content="Skip Windows Dir" IsChecked="True" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Grid>
-                        <ComboBox x:Name="SizeFilterComboBox" Width="100" Margin="5" SelectedIndex="0">
-                            <ComboBoxItem Content="All Sizes"/>
-                            <ComboBoxItem Content="> 1MB"/>
-                            <ComboBoxItem Content="> 10MB"/>
-                            <ComboBoxItem Content="> 100MB"/>
-                            <ComboBoxItem Content="> 500MB"/>
-                            <ComboBoxItem Content="> 1GB"/>
-                            <ComboBoxItem Content="> 5GB"/>
-                            <ComboBoxItem Content="> 10GB"/>
-                        </ComboBox>
-                        <ComboBox x:Name="DateFilterComboBox" Width="120" Margin="5" SelectedIndex="0" SelectionChanged="DateFilterComboBox_SelectionChanged">
-                            <ComboBoxItem Content="All Dates"/>
-                            <ComboBoxItem Content="Last Month"/>
-                            <ComboBoxItem Content="Last Year"/>
-                            <ComboBoxItem Content="Older Than 1 Year"/>
-                            <ComboBoxItem Content="Custom Range"/>
-                        </ComboBox>
-                        <DatePicker x:Name="StartDatePicker" Width="100" Margin="5" Visibility="Collapsed"/>
-                        <DatePicker x:Name="EndDatePicker" Width="100" Margin="5" Visibility="Collapsed"/>
-                        <Button Content="Apply Filters" Click="ApplyFilters_Click" Margin="5,5,15,5"/>
-                        <Button x:Name="ScanButton" Content="Scan" Click="ScanButton_Click" Width="80" Visibility="Visible" Style="{StaticResource PrimaryActionButton}"/>
-                        <Button x:Name="StopScanButton" Content="Stop Scan" Click="StopScanButton_Click" Width="80" Visibility="Collapsed"/>
-                    </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <Button Content="Apply Filters" Click="ApplyFilters_Click" Margin="0,0,5,0"/>
+                            <Button x:Name="ScanButton" Content="Scan" Click="ScanButton_Click" Width="80" Visibility="Visible" Style="{StaticResource PrimaryActionButton}"/>
+                            <Button x:Name="StopScanButton" Content="Stop Scan" Click="StopScanButton_Click" Width="80" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <ProgressBar x:Name="ScanProgressBar" Grid.Row="1" Height="5" Margin="0" BorderThickness="0" Background="Transparent" Visibility="Collapsed">
@@ -294,26 +292,33 @@
                         <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"/>
                     </ProgressBar.Foreground>
                 </ProgressBar>
-                <TextBlock x:Name="ProgressTextBlock" Grid.Row="1" Margin="10,0" VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" Visibility="Collapsed"/>
+                <TextBlock x:Name="ProgressTextBlock" Grid.Row="1" Margin="10,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" Visibility="Collapsed"/>
 
                 <TabControl Grid.Row="2" Margin="5" x:Name="MainTabControl">
                     <TabItem Header="Directory Tree">
-                        <TreeView x:Name="DirectoryTreeView" Background="Transparent" BorderThickness="0">
+                        <TreeView x:Name="DirectoryTreeView" ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0">
                             <TreeView.ItemContainerStyle>
                                 <Style TargetType="{x:Type TreeViewItem}">
                                     <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
-                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
                                     <Setter Property="Padding" Value="3"/>
+                                    <Setter Property="FontSize" Value="14"/>
                                 </Style>
                             </TreeView.ItemContainerStyle>
                             <TreeView.ItemTemplate>
                                 <HierarchicalDataTemplate DataType="{x:Type local:FileSystemNode}" ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal" Margin="2">
-                                        <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                        <Rectangle Height="15" Width="{Binding BarWidth}" Fill="{Binding BarFill, Converter={StaticResource ColorToBrushConverter}}" ToolTip="{Binding FormattedSize, StringFormat='Size: {0}'}" Margin="0,0,5,0"/>
-                                        <TextBlock Text="{Binding FullPath, Converter={StaticResource PathToNameConverter}}" Margin="0,0,10,0" ToolTip="{Binding FullPath}"/>
-                                        <TextBlock Text="{Binding FormattedSize, StringFormat='({0})'}" Foreground="Gray"/>
-                                    </StackPanel>
+                                    <Grid Margin="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Image Grid.Column="0" Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                        <Rectangle Grid.Column="1" Height="15" Width="{Binding BarWidth}" Fill="{Binding BarFill, Converter={StaticResource ColorToBrushConverter}}" ToolTip="{Binding FormattedSize, StringFormat='Size: {0}'}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding FullPath, Converter={StaticResource PathToNameConverter}}" Margin="0,0,10,0" ToolTip="{Binding FullPath}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding FormattedSize, StringFormat='({0})'}" Foreground="Gray" VerticalAlignment="Center"/>
+                                    </Grid>
                                 </HierarchicalDataTemplate>
                             </TreeView.ItemTemplate>
                         </TreeView>
@@ -321,10 +326,11 @@
                     <TabItem Header="File List">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*" MinWidth="300"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="0.5*" MinWidth="250"/>
                             </Grid.ColumnDefinitions>
-                            <DataGrid x:Name="ResultsDataGrid" Grid.Column="0" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick" SelectionChanged="ResultsDataGrid_SelectionChanged">
+                            <DataGrid x:Name="ResultsDataGrid" ItemsSource="{Binding SelectedFiles}" Grid.Column="0" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick" SelectionChanged="ResultsDataGrid_SelectionChanged">
                                 <DataGrid.RowStyle>
                                     <Style TargetType="DataGridRow">
                                         <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
@@ -338,10 +344,11 @@
                                     <DataGridTextColumn Header="Extension" Binding="{Binding Extension}" Width="100"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-                            <Border Grid.Column="1" Width="300" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0" Padding="5">
+                            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderBrush}" />
+                            <Border Grid.Column="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="5">
                                 <ScrollViewer>
                                     <StackPanel x:Name="PreviewPanel">
-                                        <TextBlock Text="File Preview" FontWeight="Bold" Margin="0,0,0,5" Foreground="{StaticResource TextBrush}"/>
+                                        <TextBlock Text="File Preview" FontWeight="Bold" Margin="0,0,0,5" Foreground="{DynamicResource TextBrush}"/>
                                         <Image x:Name="PreviewImage" Stretch="Uniform" MaxHeight="200" Visibility="Collapsed"/>
                                         <TextBox x:Name="PreviewTextBox" IsReadOnly="True" TextWrapping="Wrap" Height="200" Visibility="Collapsed"/>
                                         <TextBlock x:Name="PreviewMessage" Text="Select a file to preview" Foreground="Gray"/>
@@ -351,7 +358,7 @@
                         </Grid>
                     </TabItem>
                     <TabItem Header="Largest Files">
-                        <DataGrid x:Name="LargestFilesDataGrid" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick">
+                        <DataGrid x:Name="LargestFilesDataGrid" ItemsSource="{Binding LargestFiles}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick">
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow">
                                     <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
@@ -365,7 +372,7 @@
                         </DataGrid>
                     </TabItem>
                     <TabItem Header="Empty Folders">
-                        <DataGrid x:Name="EmptyFoldersDataGrid" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick">
+                        <DataGrid x:Name="EmptyFoldersDataGrid" ItemsSource="{Binding EmptyFolders}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick">
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow">
                                     <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
@@ -377,7 +384,7 @@
                         </DataGrid>
                     </TabItem>
                     <TabItem Header="Duplicates">
-                        <TreeView x:Name="DuplicatesTreeView" MouseDoubleClick="DuplicatesTreeView_MouseDoubleClick">
+                        <TreeView x:Name="DuplicatesTreeView" ItemsSource="{Binding Duplicates}" MouseDoubleClick="DuplicatesTreeView_MouseDoubleClick">
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type local:DuplicateSet}" ItemsSource="{Binding Files}">
                                     <StackPanel Orientation="Horizontal">
@@ -404,7 +411,7 @@
                         <Canvas x:Name="TreemapCanvas" SizeChanged="TreemapCanvas_SizeChanged"/>
                     </TabItem>
                     <TabItem Header="File Types">
-                        <DataGrid x:Name="FileTypesDataGrid" AutoGenerateColumns="False" IsReadOnly="True">
+                        <DataGrid x:Name="FileTypesDataGrid" ItemsSource="{Binding FileTypes}" AutoGenerateColumns="False" IsReadOnly="True">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Type" Binding="{Binding Extension}" Width="*"/>
                                 <DataGridTextColumn Header="Total Size" Binding="{Binding TotalSize, Converter={StaticResource FormatSizeConverter}}" Width="150"/>
@@ -413,7 +420,7 @@
                         </DataGrid>
                     </TabItem>
                     <TabItem Header="File Age">
-                        <DataGrid x:Name="FileAgeDataGrid" AutoGenerateColumns="False" IsReadOnly="True">
+                        <DataGrid x:Name="FileAgeDataGrid" ItemsSource="{Binding FileAgeStats}" AutoGenerateColumns="False" IsReadOnly="True">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Age Category" Binding="{Binding Category}" Width="*"/>
                                 <DataGridTextColumn Header="Total Size" Binding="{Binding TotalSize, Converter={StaticResource FormatSizeConverter}}" Width="150"/>
@@ -425,7 +432,7 @@
                         <TextBox x:Name="ReportsTextBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="5"/>
                     </TabItem>
                     <TabItem Header="Scan History">
-                        <DataGrid x:Name="ScanHistoryDataGrid" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ScanHistoryDataGrid_MouseDoubleClick">
+                        <DataGrid x:Name="ScanHistoryDataGrid" ItemsSource="{Binding ScanHistory}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ScanHistoryDataGrid_MouseDoubleClick">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Scan Date" Binding="{Binding ScanDate, StringFormat='g'}" Width="150"/>
                                 <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="*"/>
