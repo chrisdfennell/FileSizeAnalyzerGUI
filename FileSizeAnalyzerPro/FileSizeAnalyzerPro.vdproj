@@ -15,6 +15,12 @@
     {
         "Entry"
         {
+        "MsmKey" = "8:_37127F0E6CDD4734B3713AFEB7EA8DA1"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_8848BF047FDC4E4E9AA04F3D3B29DD91"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -50,6 +56,14 @@
             "PrerequisitesLocation" = "2:1"
             "Url" = "8:"
             "ComponentsUrl" = "8:"
+                "Items"
+                {
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:.NETFramework,Version=v4.7.2"
+                    {
+                    "Name" = "8:Microsoft .NET Framework 4.7.2 (x86 and x64)"
+                    "ProductCode" = "8:.NETFramework,Version=v4.7.2"
+                    }
+                }
             }
         }
         "Release"
@@ -114,6 +128,26 @@
         }
         "File"
         {
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_37127F0E6CDD4734B3713AFEB7EA8DA1"
+            {
+            "SourcePath" = "8:..\\FileSizeAnalyzerGUI\\assets\\icon.ico"
+            "TargetName" = "8:icon.ico"
+            "Tag" = "8:"
+            "Folder" = "8:_1652234ABA4248BAAF0F2A3ABD284F33"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
         }
         "FileType"
         {
@@ -171,7 +205,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:FileSizeAnalyzerPro"
         "ProductCode" = "8:{C96E7B94-0BB1-4D6E-A704-A36CC04B2010}"
-        "PackageCode" = "8:{1ACA3575-063C-47CF-8EA6-6B417B49CF61}"
+        "PackageCode" = "8:{B51D295E-7789-4C5F-B0D5-32B13F988BBF}"
         "UpgradeCode" = "8:{51AE7D14-F37A-4A9F-9BE7-B2782F48402A}"
         "AspNetVersion" = "8:2.0.50727.0"
         "RestartWWWService" = "11:FALSE"
@@ -179,12 +213,12 @@
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:FALSE"
         "ProductVersion" = "8:1.0.0"
-        "Manufacturer" = "8:Chris Fennell"
+        "Manufacturer" = "8:FileSizeAnalyzerPro"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
         "Title" = "8:FileSizeAnalyzerPro"
         "Subject" = "8:"
-        "ARPCONTACT" = "8:Default Company Name"
+        "ARPCONTACT" = "8:Christopher Fennell"
         "Keywords" = "8:"
         "ARPCOMMENTS" = "8:"
         "ARPURLINFOABOUT" = "8:https://github.com/chrisdfennell"
@@ -302,7 +336,7 @@
             "Target" = "8:_8848BF047FDC4E4E9AA04F3D3B29DD91"
             "Folder" = "8:_D3069D1C0E844BAE988F508CF315A626"
             "WorkingFolder" = "8:_1652234ABA4248BAAF0F2A3ABD284F33"
-            "Icon" = "8:"
+            "Icon" = "8:_37127F0E6CDD4734B3713AFEB7EA8DA1"
             "Feature" = "8:"
             }
             "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_D3D8D3A2D8BD4ADAA68E5C35960FB803"
@@ -316,7 +350,7 @@
             "Target" = "8:_8848BF047FDC4E4E9AA04F3D3B29DD91"
             "Folder" = "8:_B16D1C8C3F474E97ABAC84CABFA2443C"
             "WorkingFolder" = "8:_1652234ABA4248BAAF0F2A3ABD284F33"
-            "Icon" = "8:"
+            "Icon" = "8:_37127F0E6CDD4734B3713AFEB7EA8DA1"
             "Feature" = "8:"
             }
         }

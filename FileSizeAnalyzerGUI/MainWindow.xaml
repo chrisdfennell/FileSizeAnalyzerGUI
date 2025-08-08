@@ -43,6 +43,11 @@
             </Style.Triggers>
         </Style>
 
+        <Style TargetType="{x:Type CheckBox}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
         <!-- Primary Action Button Style -->
         <Style x:Key="PrimaryActionButton" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
@@ -121,8 +126,12 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
+                            <!-- #################################################################### -->
+                            <!-- ## THEME FIX: Added Foreground="{TemplateBinding Foreground}" to    ## -->
+                            <!-- ## ensure the selected item's text color matches the theme.       ## -->
+                            <!-- #################################################################### -->
                             <ToggleButton x:Name="ToggleButton" Focusable="false" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                          Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" >
+                                          Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" Foreground="{TemplateBinding Foreground}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -233,16 +242,12 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- #################################################################### -->
-                        <!-- ## LAYOUT FIX: Using a Grid with two rows for precise control.      ## -->
-                        <!-- #################################################################### -->
                         <Grid Grid.Column="0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <!-- Top row contains all the main filter controls -->
                             <WrapPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <ComboBox x:Name="DriveSelectionComboBox" Width="60" Margin="0,0,5,5" SelectionChanged="DriveSelectionComboBox_SelectionChanged" VerticalContentAlignment="Center"/>
                                 <TextBox x:Name="DirectoryPathTextBox" MinWidth="250" Margin="0,0,5,5"/>
@@ -272,7 +277,6 @@
                                 <DatePicker x:Name="EndDatePicker" Width="100" Margin="0,0,5,5" Visibility="Collapsed"/>
                             </WrapPanel>
 
-                            <!-- Bottom row contains the checkboxes, ensuring they are on a new line -->
                             <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,5,0,0">
                                 <CheckBox x:Name="SkipSystemFilesCheckBox" Content="Skip System Files" IsChecked="True" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <CheckBox x:Name="SkipWindowsDirCheckBox" Content="Skip Windows Dir" IsChecked="True" VerticalAlignment="Center"/>

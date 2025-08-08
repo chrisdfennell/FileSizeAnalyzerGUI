@@ -24,6 +24,12 @@ namespace FileSizeAnalyzerGUI
         public string FormattedSize { get; set; }
         public ImageSource Icon { get; set; }
 
+        // ####################################################################
+        // ## NEW FEATURE: Added a property to track if a file is a cloud-only
+        // ## placeholder, to avoid triggering downloads.
+        // ####################################################################
+        public bool IsCloudOnly { get; set; }
+
         private double _barWidth;
         public double BarWidth
         {

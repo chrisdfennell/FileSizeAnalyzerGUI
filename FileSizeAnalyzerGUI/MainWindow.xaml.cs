@@ -166,7 +166,15 @@ namespace FileSizeAnalyzerGUI
             finally
             {
                 ResetUIAfterScan();
-                _cts?.Dispose();
+                // ####################################################################
+                // ## SHUTDOWN FIX: Added a null check before disposing to prevent
+                // ## an error if the CancellationTokenSource has already been disposed.
+                // ####################################################################
+                if (_cts != null)
+                {
+                    _cts.Dispose();
+                    _cts = null;
+                }
             }
         }
 
@@ -189,10 +197,6 @@ namespace FileSizeAnalyzerGUI
             try
             {
                 dirInfo = new DirectoryInfo(path);
-                // ####################################################################
-                // ## BUG FIX: Added 'parent != null' to ensure the root scan
-                // ## directory is NEVER skipped, even if it has the System attribute.
-                // ####################################################################
                 if (parent != null && skipSystem && dirInfo.Attributes.HasFlag(FileAttributes.System))
                 {
                     return 0;
@@ -229,6 +233,9 @@ namespace FileSizeAnalyzerGUI
                     }
 
                     currentSize += file.Length;
+
+                    const FileAttributes RecallOnDataAccess = (FileAttributes)0x400000;
+
                     var fileNode = new FileSystemNode
                     {
                         FullPath = file.FullName,
@@ -237,7 +244,8 @@ namespace FileSizeAnalyzerGUI
                         Size = file.Length,
                         CreationTime = file.CreationTime,
                         LastWriteTime = file.LastWriteTime,
-                        Icon = IconManager.GetIcon(file.FullName, false)
+                        Icon = IconManager.GetIcon(file.FullName, false),
+                        IsCloudOnly = file.Attributes.HasFlag(RecallOnDataAccess)
                     };
                     nodeProgress.Report(fileNode);
                 }
@@ -289,7 +297,17 @@ namespace FileSizeAnalyzerGUI
                 Task.Run(() => GetFileAgeStats(allFoundFiles, fileAgeProgress, _cts.Token))
             };
 
-            await Task.WhenAll(analysisTasks);
+            var cancellationCompletionSource = new TaskCompletionSource<bool>();
+            using (_cts.Token.Register(() => cancellationCompletionSource.SetResult(true)))
+            {
+                analysisTasks.Add(cancellationCompletionSource.Task);
+                await Task.WhenAny(analysisTasks);
+            }
+
+            if (_cts.Token.IsCancellationRequested)
+            {
+                return;
+            }
 
             ScanHistory.Add(new ScanHistoryEntry { ScanDate = DateTime.Now, Path = scanPath, TotalSize = rootNode.Size });
             ReportsTextBox.Text = GenerateReport(rootNode.Size) + "\n--- Scan Errors ---\n" + _scanErrors.ToString();
@@ -417,10 +435,12 @@ namespace FileSizeAnalyzerGUI
 
         private void FindDuplicates(List<FileSystemNode> files, IProgress<DuplicateSet> progress, CancellationToken token)
         {
-            if (files == null || files.Count < 2) return;
+            var localFiles = files.Where(f => !f.IsCloudOnly).ToList();
+
+            if (localFiles.Count < 2) return;
 
             var filesBySize = new Dictionary<long, List<FileSystemNode>>();
-            foreach (var file in files)
+            foreach (var file in localFiles)
             {
                 if (token.IsCancellationRequested) return;
                 if (file.Size <= 4096) continue;
