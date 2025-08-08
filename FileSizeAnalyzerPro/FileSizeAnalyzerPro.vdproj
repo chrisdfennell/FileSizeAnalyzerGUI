@@ -95,6 +95,11 @@
                     "Name" = "8:Microsoft .NET Framework 4.7.2 (x86 and x64)"
                     "ProductCode" = "8:.NETFramework,Version=v4.7.2"
                     }
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:Microsoft.NetCore.DesktopRuntime.9.0.x86"
+                    {
+                    "Name" = "8:.NET Desktop Runtime 9.0.7 (x86)"
+                    "ProductCode" = "8:Microsoft.NetCore.DesktopRuntime.9.0.x86"
+                    }
                 }
             }
         }
@@ -204,15 +209,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:FileSizeAnalyzerPro"
-        "ProductCode" = "8:{C96E7B94-0BB1-4D6E-A704-A36CC04B2010}"
-        "PackageCode" = "8:{B51D295E-7789-4C5F-B0D5-32B13F988BBF}"
+        "ProductCode" = "8:{E843EF87-6A02-4376-A175-CE69D24AC385}"
+        "PackageCode" = "8:{66803319-6A73-436B-BC3A-306FA39384AE}"
         "UpgradeCode" = "8:{51AE7D14-F37A-4A9F-9BE7-B2782F48402A}"
         "AspNetVersion" = "8:2.0.50727.0"
         "RestartWWWService" = "11:FALSE"
-        "RemovePreviousVersions" = "11:FALSE"
+        "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:FALSE"
-        "ProductVersion" = "8:1.0.0"
+        "ProductVersion" = "8:1.1.0"
         "Manufacturer" = "8:FileSizeAnalyzerPro"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
@@ -754,7 +759,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_8848BF047FDC4E4E9AA04F3D3B29DD91"
             {
-            "SourcePath" = "8:..\\FileSizeAnalyzerGUI\\obj\\Release\\net8.0-windows\\apphost.exe"
+            "SourcePath" = "8:..\\FileSizeAnalyzerGUI\\obj\\Release\\net9.0-windows\\apphost.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_1652234ABA4248BAAF0F2A3ABD284F33"
@@ -782,7 +787,7 @@
             }
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_E513635790B94C4E9891D241377960E4"
             {
-            "SourcePath" = "8:..\\FileSizeAnalyzerGUI\\obj\\Release\\net8.0-windows\\FileSizeAnalyzerGUI.dll"
+            "SourcePath" = "8:..\\FileSizeAnalyzerGUI\\obj\\Release\\net9.0-windows\\FileSizeAnalyzerGUI.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_1652234ABA4248BAAF0F2A3ABD284F33"

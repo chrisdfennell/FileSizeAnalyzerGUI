@@ -29,23 +29,35 @@ namespace FileSizeAnalyzerGUI
             Application.Current.Resources.MergedDictionaries.Add(themeDictionary);
         }
 
+        // ####################################################################
+        // ## THEME FIX: The logic for detecting the Windows theme has been
+        // ## corrected to properly default to Light mode and handle registry
+        // ## values correctly.
+        // ####################################################################
         private static AppTheme GetWindowsTheme()
         {
             try
             {
-                using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-                if (key != null && key.GetValue("AppsUseLightTheme") is int value)
+                // Use Registry.GetValue for a more direct and safer approach.
+                // It allows specifying a default value if the key or value doesn't exist.
+                // We'll default to '1' (Light theme) which is a safe fallback.
+                var registryValueObject = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1);
+
+                if (registryValueObject is int registryValue)
                 {
-                    return value > 0 ? AppTheme.Light : AppTheme.Dark;
+                    // A value of 0 means the user has selected the dark theme for apps.
+                    // Any other value (typically 1) means light theme.
+                    return registryValue == 0 ? AppTheme.Dark : AppTheme.Light;
                 }
             }
-            catch
+            catch (Exception)
             {
-                // Default to dark theme if registry can't be read
-                return AppTheme.Dark;
+                // If reading the registry fails for any reason, default to the Light theme.
+                return AppTheme.Light;
             }
-            // Default to dark theme
-            return AppTheme.Dark;
+
+            // As a final fallback, default to Light theme.
+            return AppTheme.Light;
         }
     }
 }
