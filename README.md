@@ -1,6 +1,6 @@
 # FileSizeAnalyzer Pro
 
-![Screenshot of FileSizeAnalyzer Pro](assets/images/screenshot.png)
+![Screenshot of FileSizeAnalyzer Pro](assets/image/screenshot.png)
 
 ## Overview
 FileSizeAnalyzer Pro is a powerful and modern Windows utility for analyzing disk space usage. Built with WPF and C#, it provides a fast, asynchronous scanning engine and a rich set of tools to help you understand, visualize, and manage your files.  
