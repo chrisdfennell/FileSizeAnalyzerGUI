@@ -23,11 +23,6 @@ namespace FileSizeAnalyzerGUI
         public Color BarFill { get; set; }
         public string FormattedSize { get; set; }
         public ImageSource Icon { get; set; }
-
-        // ####################################################################
-        // ## NEW FEATURE: Added a property to track if a file is a cloud-only
-        // ## placeholder, to avoid triggering downloads.
-        // ####################################################################
         public bool IsCloudOnly { get; set; }
 
         private double _barWidth;
@@ -35,6 +30,17 @@ namespace FileSizeAnalyzerGUI
         {
             get => _barWidth;
             set { _barWidth = value; OnPropertyChanged(); }
+        }
+
+        // ####################################################################
+        // ## NEW FEATURE: Added IsSelected property for data binding with
+        // ## checkboxes in the UI to enable bulk operations.
+        // ####################################################################
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { _isSelected = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

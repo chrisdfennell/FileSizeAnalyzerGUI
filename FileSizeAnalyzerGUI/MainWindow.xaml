@@ -126,10 +126,6 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <!-- #################################################################### -->
-                            <!-- ## THEME FIX: Added Foreground="{TemplateBinding Foreground}" to    ## -->
-                            <!-- ## ensure the selected item's text color matches the theme.       ## -->
-                            <!-- #################################################################### -->
                             <ToggleButton x:Name="ToggleButton" Focusable="false" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                           Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" Foreground="{TemplateBinding Foreground}">
                                 <Grid>
@@ -201,6 +197,13 @@
             </Setter>
         </Style>
 
+        <ContextMenu x:Key="DuplicateSetContextMenu">
+            <MenuItem Header="Select All But Newest" Click="SelectDuplicates_KeepNewest_Click"/>
+            <MenuItem Header="Select All But Oldest" Click="SelectDuplicates_KeepOldest_Click"/>
+            <Separator />
+            <MenuItem Header="Clear Selection in Group" Click="SelectDuplicates_Clear_Click"/>
+        </ContextMenu>
+
         <ContextMenu x:Key="FileItemContextMenu">
             <MenuItem Header="Open Containing Folder" Click="OpenFolder_Click"/>
             <Separator />
@@ -229,13 +232,36 @@
 
             <Grid Grid.Row="1">
                 <Grid.RowDefinitions>
+                    <!-- #################################################################### -->
+                    <!-- ## UI REFACTOR: Added a row for the new Menu bar.                 ## -->
+                    <!-- #################################################################### -->
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10">
+                <!-- #################################################################### -->
+                <!-- ## UI REFACTOR: New Menu bar replaces the old button panel.       ## -->
+                <!-- #################################################################### -->
+                <Menu Grid.Row="0" Background="Transparent" Foreground="{DynamicResource TextBrush}">
+                    <MenuItem Header="_File">
+                        <MenuItem Header="_Export to CSV" Click="ExportButton_Click"/>
+                        <MenuItem Header="_Settings" Click="SettingsButton_Click"/>
+                        <Separator/>
+                        <MenuItem Header="E_xit" Click="Exit_Click"/>
+                    </MenuItem>
+                    <MenuItem Header="_Actions">
+                        <MenuItem Header="_Delete Selected" Click="DeleteSelected_Click"/>
+                    </MenuItem>
+                    <MenuItem Header="_Help">
+                        <MenuItem Header="_View Help" Click="HelpButton_Click"/>
+                        <Separator/>
+                        <MenuItem Header="_About" Click="AboutButton_Click"/>
+                    </MenuItem>
+                </Menu>
+
+                <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -291,14 +317,14 @@
                     </Grid>
                 </Border>
 
-                <ProgressBar x:Name="ScanProgressBar" Grid.Row="1" Height="5" Margin="0" BorderThickness="0" Background="Transparent" Visibility="Collapsed">
+                <ProgressBar x:Name="ScanProgressBar" Grid.Row="2" Height="5" Margin="0" BorderThickness="0" Background="Transparent" Visibility="Collapsed">
                     <ProgressBar.Foreground>
                         <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"/>
                     </ProgressBar.Foreground>
                 </ProgressBar>
-                <TextBlock x:Name="ProgressTextBlock" Grid.Row="1" Margin="10,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" Visibility="Collapsed"/>
+                <TextBlock x:Name="ProgressTextBlock" Grid.Row="2" Margin="10,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" Visibility="Collapsed"/>
 
-                <TabControl Grid.Row="2" Margin="5" x:Name="MainTabControl">
+                <TabControl Grid.Row="3" Margin="5" x:Name="MainTabControl">
                     <TabItem Header="Directory Tree">
                         <TreeView x:Name="DirectoryTreeView" ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0">
                             <TreeView.ItemContainerStyle>
@@ -341,6 +367,13 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
+                                    <DataGridTemplateColumn>
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="Path" Binding="{Binding FullPath}" Width="*"/>
                                     <DataGridTextColumn Header="Size" Binding="{Binding FormattedSize}" Width="100"/>
                                     <DataGridTextColumn Header="Creation Time" Binding="{Binding CreationTime, StringFormat='g'}" Width="150"/>
@@ -369,6 +402,13 @@
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
+                                <DataGridTemplateColumn>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Path" Binding="{Binding FullPath}" Width="*"/>
                                 <DataGridTextColumn Header="Size" Binding="{Binding FormattedSize}" Width="100"/>
                                 <DataGridTextColumn Header="Last Write Time" Binding="{Binding LastWriteTime, StringFormat='g'}" Width="150"/>
@@ -383,6 +423,13 @@
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
+                                <DataGridTemplateColumn>
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Path" Binding="{Binding FullPath}" Width="*"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -391,7 +438,7 @@
                         <TreeView x:Name="DuplicatesTreeView" ItemsSource="{Binding Duplicates}" MouseDoubleClick="DuplicatesTreeView_MouseDoubleClick">
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type local:DuplicateSet}" ItemsSource="{Binding Files}">
-                                    <StackPanel Orientation="Horizontal">
+                                    <StackPanel Orientation="Horizontal" ContextMenu="{StaticResource DuplicateSetContextMenu}">
                                         <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,5,0" />
                                         <TextBlock Text="{Binding FileName}" FontWeight="Bold"/>
                                         <TextBlock Text="{Binding Count, StringFormat=' ({0} copies)'}" Margin="5,0,0,0"/>
@@ -400,6 +447,7 @@
                                 </HierarchicalDataTemplate>
                                 <DataTemplate DataType="{x:Type local:FileSystemNode}">
                                     <StackPanel Orientation="Horizontal">
+                                        <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                         <TextBlock Text="{Binding FullPath}" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -445,12 +493,6 @@
                         </DataGrid>
                     </TabItem>
                 </TabControl>
-
-                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="10">
-                    <Button Content="Help" Click="HelpButton_Click" Width="100" Margin="0,0,10,0"/>
-                    <Button Content="Export to CSV" Click="ExportButton_Click" Width="100" Margin="0,0,10,0"/>
-                    <Button x:Name="AboutButton" Content="About" Click="AboutButton_Click" Width="100"/>
-                </StackPanel>
             </Grid>
         </Grid>
     </Border>

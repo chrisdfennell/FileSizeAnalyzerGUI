@@ -1,16 +1,86 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF1E1E1E"/>
-  <SolidColorBrush x:Key="BorderBrush" Color="#FF333333"/>
-  <SolidColorBrush x:Key="TextBrush" Color="#FFDCDCDC"/>
-  <SolidColorBrush x:Key="GlyphBrush" Color="#FFCCCCCC"/>
-  <SolidColorBrush x:Key="AccentBrush" Color="#FF007ACC"/>
-  <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF009AFB"/>
-  <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FF2D2D2D"/>
-  <SolidColorBrush x:Key="ControlHoverBrush" Color="#FF3E3E42"/>
-  <SolidColorBrush x:Key="ControlPressedBrush" Color="#FF007ACC"/>
-  <SolidColorBrush x:Key="ComboBoxPopupBackgroundBrush" Color="#FF2D2D2D" />
-  <SolidColorBrush x:Key="ComboBoxItemHoverBrush" Color="#FF3E3E42" />
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF1E1E1E"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#FF333333"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#FFDCDCDC"/>
+    <SolidColorBrush x:Key="GlyphBrush" Color="#FFCCCCCC"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF007ACC"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF009AFB"/>
+    <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FF2D2D2D"/>
+    <SolidColorBrush x:Key="ControlHoverBrush" Color="#FF3E3E42"/>
+    <SolidColorBrush x:Key="ControlPressedBrush" Color="#FF007ACC"/>
+    <SolidColorBrush x:Key="ComboBoxPopupBackgroundBrush" Color="#FF2D2D2D" />
+    <SolidColorBrush x:Key="ComboBoxItemHoverBrush" Color="#FF3E3E42" />
+
+    <!-- #################################################################### -->
+    <!-- ## THEME FIX: Added styles for Menu and MenuItem to ensure they     ## -->
+    <!-- ## render correctly in dark mode.                                 ## -->
+    <!-- #################################################################### -->
+    <Style TargetType="{x:Type Menu}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+    </Style>
+
+    <Style TargetType="{x:Type MenuItem}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+        <Setter Property="Padding" Value="6,4"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type MenuItem}">
+                    <Grid>
+                        <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="Icon"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="Shortcut"/>
+                                    <ColumnDefinition Width="14"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="Icon" Margin="6,0,6,0" VerticalAlignment="Center" ContentSource="Icon"/>
+                                <ContentPresenter x:Name="HeaderHost" Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="InputGestureText" Grid.Column="2" Text="{TemplateBinding InputGestureText}" Margin="5,2,2,2" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+                                <Path x:Name="Arrow" Grid.Column="3" VerticalAlignment="Center" Fill="{TemplateBinding Foreground}" Data="M 0 0 L 4 4 L 0 8 Z" Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+                        <Popup x:Name="SubMenuPopup" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Right" Focusable="false" AllowsTransparency="true" PopupAnimation="Fade">
+                            <Border x:Name="SubmenuBorder" Background="{DynamicResource ControlBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="2">
+                                <!-- #################################################################### -->
+                                <!-- ## UI FIX: Changed ScrollViewer properties to remove unwanted     ## -->
+                                <!-- ## scrollbar from the menu.                                       ## -->
+                                <!-- #################################################################### -->
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Cycle" Grid.IsSharedSizeScope="true"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter TargetName="SubMenuPopup" Property="Placement" Value="Bottom"/>
+                        </Trigger>
+                        <Trigger Property="HasItems" Value="true">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource GlyphBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- This style applies to the popup part of the menu -->
+    <Style TargetType="{x:Type ContextMenu}">
+        <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+    </Style>
 
 </ResourceDictionary>

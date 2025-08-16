@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -30,15 +31,68 @@ namespace FileSizeAnalyzerGUI
         public ObservableCollection<ScanHistoryEntry> ScanHistory { get; set; }
 
         private CancellationTokenSource _cts;
-        private readonly StringBuilder _scanErrors;
+        private readonly StringBuilder _scanErrors = new StringBuilder();
         private DateTime _lastStatusUpdateTime; // For throttling UI updates
+        private List<string> _exclusionList = new List<string>();
+        private readonly Dictionary<string, string> _cliArgs;
 
         private static readonly string WindowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
 
         public MainWindow()
         {
             InitializeComponent();
+            InitializeData();
+        }
 
+        public MainWindow(string initialPath) : this()
+        {
+            if (!string.IsNullOrEmpty(initialPath) && Directory.Exists(initialPath))
+            {
+                DirectoryPathTextBox.Text = initialPath;
+                Loaded += (s, e) => ScanButton_Click(null, null);
+            }
+        }
+
+        public MainWindow(Dictionary<string, string> cliArgs) : this()
+        {
+            _cliArgs = cliArgs;
+
+            if (_cliArgs.ContainsKey("-no-skip-system"))
+            {
+                SkipSystemFilesCheckBox.IsChecked = false;
+            }
+            if (_cliArgs.ContainsKey("-no-skip-windows"))
+            {
+                SkipWindowsDirCheckBox.IsChecked = false;
+            }
+
+            Loaded += MainWindow_Loaded_Cli;
+        }
+
+        private async void MainWindow_Loaded_Cli(object sender, RoutedEventArgs e)
+        {
+            if (_cliArgs == null) return;
+
+            DirectoryPathTextBox.Text = _cliArgs["-path"];
+            await RunScanAsync();
+
+            if (_cliArgs.TryGetValue("-export", out var exportPath))
+            {
+                if (string.IsNullOrWhiteSpace(exportPath))
+                {
+                    exportPath = $"FileSizeAnalyzer-Report-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
+                }
+                await Task.Run(() => CsvExporter.ExportToCsv(AllFiles.ToList(), exportPath));
+            }
+
+            if (_cliArgs.ContainsKey("-exit"))
+            {
+                Application.Current.Shutdown();
+            }
+        }
+
+        private void InitializeData()
+        {
             RootNodes = new ObservableCollection<FileSystemNode>();
             AllFiles = new ObservableCollection<FileSystemNode>();
             SelectedFiles = new ObservableCollection<FileSystemNode>();
@@ -48,7 +102,6 @@ namespace FileSizeAnalyzerGUI
             LargestFiles = new ObservableCollection<FileSystemNode>();
             EmptyFolders = new ObservableCollection<FileSystemNode>();
             ScanHistory = new ObservableCollection<ScanHistoryEntry>();
-            _scanErrors = new StringBuilder();
 
             this.DataContext = this;
 
@@ -86,12 +139,19 @@ namespace FileSizeAnalyzerGUI
         #region Scanning Logic
         private async void ScanButton_Click(object sender, RoutedEventArgs e)
         {
+            await RunScanAsync();
+        }
+
+        private async Task RunScanAsync()
+        {
             string scanPath = DirectoryPathTextBox.Text;
             if (string.IsNullOrWhiteSpace(scanPath) || !Directory.Exists(scanPath))
             {
                 MessageBox.Show($"The specified path '{scanPath}' does not exist.", "Invalid Path", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
+
+            _exclusionList = SettingsManager.LoadSettings().ExclusionPatterns;
 
             _cts = new CancellationTokenSource();
             _scanErrors.Clear();
@@ -166,10 +226,6 @@ namespace FileSizeAnalyzerGUI
             finally
             {
                 ResetUIAfterScan();
-                // ####################################################################
-                // ## SHUTDOWN FIX: Added a null check before disposing to prevent
-                // ## an error if the CancellationTokenSource has already been disposed.
-                // ####################################################################
                 if (_cts != null)
                 {
                     _cts.Dispose();
@@ -181,6 +237,11 @@ namespace FileSizeAnalyzerGUI
         private long ScanDirectoryRecursive(string path, FileSystemNode parent, IProgress<FileSystemNode> nodeProgress, IProgress<string> textProgress, CancellationToken token, bool skipSystem, bool skipWindows)
         {
             if (token.IsCancellationRequested) return 0;
+
+            if (IsExcluded(path, _exclusionList))
+            {
+                return 0;
+            }
 
             if (skipWindows && path.StartsWith(WindowsDirectory, StringComparison.OrdinalIgnoreCase))
             {
@@ -228,6 +289,11 @@ namespace FileSizeAnalyzerGUI
                     if (token.IsCancellationRequested) return 0;
 
                     if (skipSystem && file.Attributes.HasFlag(FileAttributes.System))
+                    {
+                        continue;
+                    }
+
+                    if (IsExcluded(file.FullName, _exclusionList))
                     {
                         continue;
                     }
@@ -291,18 +357,13 @@ namespace FileSizeAnalyzerGUI
 
             var analysisTasks = new List<Task>
             {
-                Task.Run(() => FindDuplicates(allFoundFiles, duplicateProgress, _cts.Token)),
-                Task.Run(() => FindEmptyFolders(rootNode, emptyFolderProgress, _cts.Token)),
-                Task.Run(() => GetFileTypeStats(allFoundFiles, fileTypeProgress, _cts.Token)),
-                Task.Run(() => GetFileAgeStats(allFoundFiles, fileAgeProgress, _cts.Token))
+                Task.Run(() => FindDuplicates(allFoundFiles, duplicateProgress, _cts.Token), _cts.Token),
+                Task.Run(() => FindEmptyFolders(rootNode, emptyFolderProgress, _cts.Token), _cts.Token),
+                Task.Run(() => GetFileTypeStats(allFoundFiles, fileTypeProgress, _cts.Token), _cts.Token),
+                Task.Run(() => GetFileAgeStats(allFoundFiles, fileAgeProgress, _cts.Token), _cts.Token)
             };
 
-            var cancellationCompletionSource = new TaskCompletionSource<bool>();
-            using (_cts.Token.Register(() => cancellationCompletionSource.SetResult(true)))
-            {
-                analysisTasks.Add(cancellationCompletionSource.Task);
-                await Task.WhenAny(analysisTasks);
-            }
+            await Task.WhenAll(analysisTasks);
 
             if (_cts.Token.IsCancellationRequested)
             {
@@ -496,20 +557,83 @@ namespace FileSizeAnalyzerGUI
                     foreach (var confirmedGroup in filesByFullHash.Values)
                     {
                         if (token.IsCancellationRequested) return;
-                        if (confirmedGroup.Count > 1)
+                        if (confirmedGroup.Count < 2) continue;
+
+                        var trulyIdenticalGroups = new List<List<FileSystemNode>>();
+                        var checkedFiles = new HashSet<FileSystemNode>();
+
+                        for (int i = 0; i < confirmedGroup.Count; i++)
+                        {
+                            var file1 = confirmedGroup[i];
+                            if (checkedFiles.Contains(file1)) continue;
+
+                            var currentGroup = new List<FileSystemNode> { file1 };
+                            checkedFiles.Add(file1);
+
+                            for (int j = i + 1; j < confirmedGroup.Count; j++)
+                            {
+                                var file2 = confirmedGroup[j];
+                                if (checkedFiles.Contains(file2)) continue;
+
+                                if (AreFilesIdentical(file1.FullPath, file2.FullPath))
+                                {
+                                    currentGroup.Add(file2);
+                                    checkedFiles.Add(file2);
+                                }
+                            }
+
+                            if (currentGroup.Count > 1)
+                            {
+                                trulyIdenticalGroups.Add(currentGroup);
+                            }
+                        }
+
+                        foreach (var actualDuplicateGroup in trulyIdenticalGroups)
                         {
                             var duplicateSet = new DuplicateSet
                             {
-                                FileName = Path.GetFileName(confirmedGroup.First().FullPath),
-                                Count = confirmedGroup.Count(),
-                                FormattedSize = FormatSize(confirmedGroup.First().Size * confirmedGroup.Count()),
-                                Icon = confirmedGroup.First().Icon,
-                                Files = new ObservableCollection<FileSystemNode>(confirmedGroup)
+                                FileName = Path.GetFileName(actualDuplicateGroup.First().FullPath),
+                                Count = actualDuplicateGroup.Count(),
+                                FormattedSize = FormatSize(actualDuplicateGroup.First().Size * actualDuplicateGroup.Count()),
+                                Icon = actualDuplicateGroup.First().Icon,
+                                Files = new ObservableCollection<FileSystemNode>(actualDuplicateGroup)
                             };
                             progress.Report(duplicateSet);
                         }
                     }
                 }
+            }
+        }
+
+        private bool AreFilesIdentical(string path1, string path2)
+        {
+            const int bufferSize = 8192; // 8 KB buffer
+            try
+            {
+                using var fs1 = new FileStream(path1, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var fs2 = new FileStream(path2, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+                var buffer1 = new byte[bufferSize];
+                var buffer2 = new byte[bufferSize];
+
+                while (true)
+                {
+                    int bytesRead1 = fs1.Read(buffer1, 0, bufferSize);
+                    int bytesRead2 = fs2.Read(buffer2, 0, bufferSize);
+
+                    if (bytesRead1 != bytesRead2) return false;
+                    if (bytesRead1 == 0) return true; // End of both files, they are identical
+
+                    if (!buffer1.AsSpan(0, bytesRead1).SequenceEqual(buffer2.AsSpan(0, bytesRead2)))
+                    {
+                        return false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _scanErrors.AppendLine($"Could not compare files '{Path.GetFileName(path1)}' and '{Path.GetFileName(path2)}': {ex.Message}");
+                return false;
             }
         }
 
@@ -635,18 +759,29 @@ namespace FileSizeAnalyzerGUI
 
         private async void ExportButton_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedFiles == null || !SelectedFiles.Any())
+            if (AllFiles == null || !AllFiles.Any())
             {
-                MessageBox.Show("No data to export.");
+                MessageBox.Show("No data to export. Please run a scan first.");
                 return;
             }
-            string csvPath = Path.Combine(Directory.GetCurrentDirectory(), "file_size_report.csv");
-            await Task.Run(() => CsvExporter.ExportToCsv(SelectedFiles.ToList(), csvPath));
-            MessageBox.Show($"Exported to {csvPath}");
+
+            var sfd = new SaveFileDialog
+            {
+                Filter = "CSV File (*.csv)|*.csv",
+                FileName = $"FileSizeAnalyzer-Report-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv"
+            };
+
+            if (sfd.ShowDialog() == true)
+            {
+                await Task.Run(() => CsvExporter.ExportToCsv(AllFiles.ToList(), sfd.FileName));
+                MessageBox.Show($"Exported to {sfd.FileName}");
+            }
         }
 
         private void HelpButton_Click(object sender, RoutedEventArgs e) => new HelpWindow { Owner = this }.ShowDialog();
         private void AboutButton_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
+        private void SettingsButton_Click(object sender, RoutedEventArgs e) => new SettingsWindow { Owner = this }.ShowDialog();
+        private void Exit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
 
         private void OpenFolder_Click(object sender, RoutedEventArgs e)
         {
@@ -674,6 +809,82 @@ namespace FileSizeAnalyzerGUI
             }
         }
 
+        private async void DeleteSelected_Click(object sender, RoutedEventArgs e)
+        {
+            var itemsToDelete = new HashSet<FileSystemNode>(AllFiles.Where(f => f.IsSelected));
+            foreach (var duplicateSet in Duplicates)
+            {
+                foreach (var file in duplicateSet.Files.Where(f => f.IsSelected))
+                {
+                    itemsToDelete.Add(file);
+                }
+            }
+            foreach (var folder in EmptyFolders.Where(f => f.IsSelected))
+            {
+                itemsToDelete.Add(folder);
+            }
+
+            if (!itemsToDelete.Any())
+            {
+                MessageBox.Show("No items selected for deletion.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string message = $"Are you sure you want to move {itemsToDelete.Count} selected item(s) to the Recycle Bin?";
+            if (MessageBox.Show(message, "Confirm Bulk Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            {
+                await DeleteMultipleFilesAsync(itemsToDelete.ToList());
+            }
+        }
+
+        private async Task DeleteMultipleFilesAsync(List<FileSystemNode> items)
+        {
+            ProgressTextBlock.Text = "Deleting items...";
+            ProgressTextBlock.Visibility = Visibility.Visible;
+            ScanProgressBar.IsIndeterminate = false;
+            ScanProgressBar.Value = 0;
+            ScanProgressBar.Maximum = items.Count;
+            ScanProgressBar.Visibility = Visibility.Visible;
+
+            int deletedCount = 0;
+            var deleteErrors = new StringBuilder();
+
+            await Task.Run(() =>
+            {
+                foreach (var item in items)
+                {
+                    try
+                    {
+                        if (item.IsDirectory)
+                        {
+                            if (Directory.Exists(item.FullPath))
+                                FileSystem.DeleteDirectory(item.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                        }
+                        else
+                        {
+                            if (File.Exists(item.FullPath))
+                                FileSystem.DeleteFile(item.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                        }
+                        deletedCount++;
+                        Dispatcher.Invoke(() => ScanProgressBar.Value = deletedCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        deleteErrors.AppendLine($"Failed to delete {item.FullPath}: {ex.Message}");
+                    }
+                }
+            });
+
+            string summaryMessage = $"{deletedCount} item(s) moved to Recycle Bin.";
+            if (deleteErrors.Length > 0)
+            {
+                summaryMessage += "\n\nSome errors occurred:\n" + deleteErrors.ToString();
+            }
+            MessageBox.Show(summaryMessage, "Deletion Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            await RunScanAsync();
+        }
+
         private async Task DeleteFileAsync(FileSystemNode file)
         {
             string message = file.IsDirectory
@@ -690,7 +901,7 @@ namespace FileSizeAnalyzerGUI
                         else FileSystem.DeleteFile(file.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
                     });
                     MessageBox.Show("Item(s) moved to Recycle Bin.");
-                    ScanButton_Click(null, null); // Rescan to refresh data
+                    await RunScanAsync();
                 }
                 catch (Exception ex)
                 {
@@ -888,6 +1099,19 @@ namespace FileSizeAnalyzerGUI
         #endregion
 
         #region Utility Methods
+        private bool IsExcluded(string path, List<string> patterns)
+        {
+            foreach (var pattern in patterns)
+            {
+                var regexPattern = "^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$";
+                if (Regex.IsMatch(path, regexPattern, RegexOptions.IgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private Color GetRandomColor() => Color.FromRgb((byte)new Random().Next(100, 220), (byte)new Random().Next(100, 220), (byte)new Random().Next(100, 220));
 
         private IEnumerable<FileSystemNode> GetAllNodes(FileSystemNode node)
@@ -980,6 +1204,47 @@ namespace FileSizeAnalyzerGUI
             {
                 node.Children.Add(child);
                 SortAllNodesBySize(child);
+            }
+        }
+        #endregion
+
+        #region Duplicate Management Handlers
+        private void SelectDuplicates_KeepNewest_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is DuplicateSet duplicateSet)
+            {
+                var newestFile = duplicateSet.Files.OrderByDescending(f => f.LastWriteTime).FirstOrDefault();
+                if (newestFile == null) return;
+
+                foreach (var file in duplicateSet.Files)
+                {
+                    file.IsSelected = file.FullPath != newestFile.FullPath;
+                }
+            }
+        }
+
+        private void SelectDuplicates_KeepOldest_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is DuplicateSet duplicateSet)
+            {
+                var oldestFile = duplicateSet.Files.OrderBy(f => f.LastWriteTime).FirstOrDefault();
+                if (oldestFile == null) return;
+
+                foreach (var file in duplicateSet.Files)
+                {
+                    file.IsSelected = file.FullPath != oldestFile.FullPath;
+                }
+            }
+        }
+
+        private void SelectDuplicates_Clear_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is DuplicateSet duplicateSet)
+            {
+                foreach (var file in duplicateSet.Files)
+                {
+                    file.IsSelected = false;
+                }
             }
         }
         #endregion
