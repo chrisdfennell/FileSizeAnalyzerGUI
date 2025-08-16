@@ -8,14 +8,12 @@
         Title="FileSizeAnalyzer Pro" Height="650" Width="1100"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen">
-
     <Window.Resources>
         <!-- Converters -->
         <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
         <local:FormatSizeConverter x:Key="FormatSizeConverter"/>
         <local:PathToNameConverter x:Key="PathToNameConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
-
         <!-- Base Button Style -->
         <Style TargetType="{x:Type Button}">
             <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
@@ -42,12 +40,10 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
         <Style TargetType="{x:Type CheckBox}">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-
         <!-- Primary Action Button Style -->
         <Style x:Key="PrimaryActionButton" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
@@ -61,7 +57,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
         <!-- Custom Title Bar Button Style -->
         <Style x:Key="TitleBarButton" TargetType="Button">
             <Setter Property="Width" Value="46"/>
@@ -86,7 +81,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
         <Style x:Key="CloseButton" TargetType="Button" BasedOn="{StaticResource TitleBarButton}">
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
@@ -95,7 +89,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
         <!-- ComboBox Style -->
         <Style TargetType="{x:Type ComboBoxItem}">
             <Setter Property="Padding" Value="5,3"/>
@@ -116,7 +109,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
         <Style TargetType="{x:Type ComboBox}">
             <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -153,7 +145,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <!-- TextBox Style -->
         <Style TargetType="{x:Type TextBox}">
             <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}"/>
@@ -163,7 +154,6 @@
             <Setter Property="Padding" Value="4,3"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-
         <!-- TabControl and TabItem Styles -->
         <Style TargetType="{x:Type TabControl}">
             <Setter Property="Background" Value="Transparent"/>
@@ -196,28 +186,24 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <ContextMenu x:Key="DuplicateSetContextMenu">
             <MenuItem Header="Select All But Newest" Click="SelectDuplicates_KeepNewest_Click"/>
             <MenuItem Header="Select All But Oldest" Click="SelectDuplicates_KeepOldest_Click"/>
             <Separator />
             <MenuItem Header="Clear Selection in Group" Click="SelectDuplicates_Clear_Click"/>
         </ContextMenu>
-
         <ContextMenu x:Key="FileItemContextMenu">
             <MenuItem Header="Open Containing Folder" Click="OpenFolder_Click"/>
             <Separator />
             <MenuItem Header="Move to Recycle Bin" Click="Delete_Click"/>
         </ContextMenu>
     </Window.Resources>
-
     <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource WindowBackgroundBrush}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-
             <Grid Grid.Row="0" Height="32" Background="Transparent" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0">
                     <Image Source="/assets/icon.ico" Width="16" Height="16"/>
@@ -229,21 +215,13 @@
                     <Button Content="" Click="Close_Click" Style="{StaticResource CloseButton}"/>
                 </StackPanel>
             </Grid>
-
             <Grid Grid.Row="1">
                 <Grid.RowDefinitions>
-                    <!-- #################################################################### -->
-                    <!-- ## UI REFACTOR: Added a row for the new Menu bar.                 ## -->
-                    <!-- #################################################################### -->
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-
-                <!-- #################################################################### -->
-                <!-- ## UI REFACTOR: New Menu bar replaces the old button panel.       ## -->
-                <!-- #################################################################### -->
                 <Menu Grid.Row="0" Background="Transparent" Foreground="{DynamicResource TextBrush}">
                     <MenuItem Header="_File">
                         <MenuItem Header="_Export to CSV" Click="ExportButton_Click"/>
@@ -260,20 +238,17 @@
                         <MenuItem Header="_About" Click="AboutButton_Click"/>
                     </MenuItem>
                 </Menu>
-
                 <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-
                         <Grid Grid.Column="0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-
                             <WrapPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <ComboBox x:Name="DriveSelectionComboBox" Width="60" Margin="0,0,5,5" SelectionChanged="DriveSelectionComboBox_SelectionChanged" VerticalContentAlignment="Center"/>
                                 <TextBox x:Name="DirectoryPathTextBox" MinWidth="250" Margin="0,0,5,5"/>
@@ -302,28 +277,38 @@
                                 <DatePicker x:Name="StartDatePicker" Width="100" Margin="0,0,5,5" Visibility="Collapsed"/>
                                 <DatePicker x:Name="EndDatePicker" Width="100" Margin="0,0,5,5" Visibility="Collapsed"/>
                             </WrapPanel>
-
                             <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,5,0,0">
                                 <CheckBox x:Name="SkipSystemFilesCheckBox" Content="Skip System Files" IsChecked="True" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                 <CheckBox x:Name="SkipWindowsDirCheckBox" Content="Skip Windows Dir" IsChecked="True" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Grid>
-
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <Button Content="Save Filter..." Click="SaveFilter_Click" Margin="0,0,5,0"/>
+                            <Button x:Name="LoadFilterButton" Click="LoadFilter_Click" Margin="0,0,5,0">
+                                <Button.Content>
+                                    <TextBlock Text="Load Filter"/>
+                                </Button.Content>
+                                <Button.ContextMenu>
+                                    <ContextMenu x:Name="FilterContextMenu"
+                                                 Placement="Bottom"
+                                                 PlacementTarget="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Button}}}"
+                                                 Opened="LoadFilterContextMenu_Opening">
+                                        <!-- The menu items will be populated dynamically in the code-behind -->
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
                             <Button Content="Apply Filters" Click="ApplyFilters_Click" Margin="0,0,5,0"/>
                             <Button x:Name="ScanButton" Content="Scan" Click="ScanButton_Click" Width="80" Visibility="Visible" Style="{StaticResource PrimaryActionButton}"/>
                             <Button x:Name="StopScanButton" Content="Stop Scan" Click="StopScanButton_Click" Width="80" Visibility="Collapsed"/>
                         </StackPanel>
                     </Grid>
                 </Border>
-
                 <ProgressBar x:Name="ScanProgressBar" Grid.Row="2" Height="5" Margin="0" BorderThickness="0" Background="Transparent" Visibility="Collapsed">
                     <ProgressBar.Foreground>
                         <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"/>
                     </ProgressBar.Foreground>
                 </ProgressBar>
                 <TextBlock x:Name="ProgressTextBlock" Grid.Row="2" Margin="10,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" Visibility="Collapsed"/>
-
                 <TabControl Grid.Row="3" Margin="5" x:Name="MainTabControl">
                     <TabItem Header="Directory Tree">
                         <TreeView x:Name="DirectoryTreeView" ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0">

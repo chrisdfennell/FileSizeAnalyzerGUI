@@ -10,6 +10,16 @@ using System.Windows.Media.Imaging;
 
 namespace FileSizeAnalyzerGUI
 {
+    public class FilterPreset
+    {
+        public string Name { get; set; }
+        public string ExtensionFilter { get; set; }
+        public int SizeFilterIndex { get; set; }
+        public int DateFilterIndex { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+    }
+
     public class FileSystemNode : INotifyPropertyChanged
     {
         public string FullPath { get; set; }
@@ -32,10 +42,6 @@ namespace FileSizeAnalyzerGUI
             set { _barWidth = value; OnPropertyChanged(); }
         }
 
-        // ####################################################################
-        // ## NEW FEATURE: Added IsSelected property for data binding with
-        // ## checkboxes in the UI to enable bulk operations.
-        // ####################################################################
         private bool _isSelected;
         public bool IsSelected
         {

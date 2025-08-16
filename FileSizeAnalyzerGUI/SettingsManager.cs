@@ -8,6 +8,7 @@ namespace FileSizeAnalyzerGUI
     public class AppSettings
     {
         public List<string> ExclusionPatterns { get; set; } = new List<string>();
+        public List<FilterPreset> FilterPresets { get; set; } = new List<FilterPreset>();
     }
 
     public static class SettingsManager

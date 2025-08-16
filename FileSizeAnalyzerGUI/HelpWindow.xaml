@@ -1,7 +1,7 @@
 ﻿<Window x:Class="FileSizeAnalyzerGUI.HelpWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Help" Height="450" Width="600"
+        Title="Help" Height="550" Width="600"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <ScrollViewer Margin="15">
         <StackPanel>
@@ -21,29 +21,43 @@
                 - In the text box, you can filter by multiple file extensions. Separate them with a comma or semicolon (e.g., .jpg, .log; .tmp).
                 <LineBreak/>
                 - Click 'Apply Filters' to update the 'File List' tab with your filter criteria.
+                <LineBreak/>
+                - You can save a combination of filters by clicking 'Save Filter...' and giving it a name. Load it later from the 'Load Filter' dropdown.
             </TextBlock>
 
             <TextBlock FontWeight="Bold" Margin="0,10,0,5">Interacting with Results</TextBlock>
             <TextBlock TextWrapping="Wrap">
                 - Right-click on any file or folder in the lists to open its location or move it to the Recycle Bin.
                 <LineBreak/>
-                - Double-clicking an item in the 'File List' or 'Duplicates' tab will also prompt to move it to the Recycle Bin.
+                - In the 'Duplicates' tab, you can right-click a duplicate group header to auto-select all but the newest or oldest file for easy cleanup.
             </TextBlock>
 
-            <TextBlock FontWeight="Bold" Margin="0,10,0,5">Tabs</TextBlock>
+            <TextBlock FontWeight="Bold" Margin="0,10,0,5">Settings &amp; Exclusions</TextBlock>
             <TextBlock TextWrapping="Wrap">
-                - <Bold>Directory Tree:</Bold> A hierarchical view of your scanned folder, sorted by size.
+                - Go to <Bold>File -&gt; Settings</Bold> to open the Exclusion List manager.
                 <LineBreak/>
-                - <Bold>File List:</Bold> A list of all files found, which can be filtered using the controls at the top.
+                - Add folder paths or file patterns to this list to ignore them during scans. Each pattern should be on a new line.
                 <LineBreak/>
-                - <Bold>Largest Files:</Bold> A quick view of the top 100 largest files from the scan.
-                <LineBreak/>
-                - <Bold>Empty Folders:</Bold> A list of all folders that contain no files or subfolders.
-                <LineBreak/>
-                - <Bold>Duplicates:</Bold> A grouped view of files that have identical content.
-                <LineBreak/>
-                - <Bold>Treemap:</Bold> A visual representation of the currently selected folder in the 'Directory Tree' tab. Click a rectangle to navigate to that item in the tree.
+                - Use '*' as a wildcard. For example: <Bold>*.tmp</Bold> (excludes all temp files), <Bold>C:\Users\*\AppData</Bold> (excludes the AppData folder for all users).
             </TextBlock>
+
+            <TextBlock FontWeight="Bold" Margin="0,10,0,5">Command-Line Usage</TextBlock>
+            <TextBlock TextWrapping="Wrap">
+                The application can be run from a command prompt for automated scans.
+                <LineBreak/>
+                <Bold>Required:</Bold> -path "C:\Your\Folder"
+                <LineBreak/>
+                <Bold>Optional:</Bold>
+                <LineBreak/>
+                -export "report.csv" (Exports the results to a CSV file)
+                <LineBreak/>
+                -exit (Closes the app after scanning and exporting)
+                <LineBreak/>
+                -no-skip-system (Includes system files in the scan)
+                <LineBreak/>
+                -no-skip-windows (Includes the Windows directory in the scan)
+            </TextBlock>
+
         </StackPanel>
     </ScrollViewer>
 </Window>

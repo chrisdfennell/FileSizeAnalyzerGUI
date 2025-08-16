@@ -965,6 +965,72 @@ namespace FileSizeAnalyzerGUI
         }
         #endregion
 
+        #region Filter Preset Handlers
+        private void SaveFilter_Click(object sender, RoutedEventArgs e)
+        {
+            var saveDialog = new SaveFilterWindow { Owner = this };
+            if (saveDialog.ShowDialog() == true)
+            {
+                var newPreset = new FilterPreset
+                {
+                    Name = saveDialog.FilterName,
+                    ExtensionFilter = ExtensionFilterTextBox.Text,
+                    SizeFilterIndex = SizeFilterComboBox.SelectedIndex,
+                    DateFilterIndex = DateFilterComboBox.SelectedIndex,
+                    StartDate = StartDatePicker.SelectedDate,
+                    EndDate = EndDatePicker.SelectedDate
+                };
+
+                var settings = SettingsManager.LoadSettings();
+                settings.FilterPresets.RemoveAll(p => p.Name.Equals(newPreset.Name, StringComparison.OrdinalIgnoreCase));
+                settings.FilterPresets.Add(newPreset);
+                SettingsManager.SaveSettings(settings);
+            }
+        }
+
+        private void LoadFilter_Click(object sender, RoutedEventArgs e)
+        {
+            LoadFilterButton.ContextMenu.IsOpen = true;
+        }
+
+        private void LoadFilterContextMenu_Opening(object sender, RoutedEventArgs e)
+        {
+            var contextMenu = sender as ContextMenu;
+            if (contextMenu == null) return;
+
+            contextMenu.Items.Clear();
+            var settings = SettingsManager.LoadSettings();
+
+            if (settings.FilterPresets.Any())
+            {
+                foreach (var preset in settings.FilterPresets.OrderBy(p => p.Name))
+                {
+                    var menuItem = new MenuItem { Header = preset.Name, Tag = preset };
+                    menuItem.Click += ApplyFilterPreset_Click;
+                    contextMenu.Items.Add(menuItem);
+                }
+            }
+            else
+            {
+                contextMenu.Items.Add(new MenuItem { Header = "No saved filters", IsEnabled = false });
+            }
+        }
+
+        private void ApplyFilterPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.Tag is FilterPreset preset)
+            {
+                ExtensionFilterTextBox.Text = preset.ExtensionFilter;
+                SizeFilterComboBox.SelectedIndex = preset.SizeFilterIndex;
+                DateFilterComboBox.SelectedIndex = preset.DateFilterIndex;
+                StartDatePicker.SelectedDate = preset.StartDate;
+                EndDatePicker.SelectedDate = preset.EndDate;
+
+                ApplyFilters_Click(null, null);
+            }
+        }
+        #endregion
+
         #region Treemap and Visualization
         private void DirectoryTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e) => DrawTreemap();
         private void TreemapCanvas_SizeChanged(object sender, SizeChangedEventArgs e) => DrawTreemap();
