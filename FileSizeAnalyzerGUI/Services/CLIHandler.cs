@@ -381,7 +381,7 @@ namespace FileSizeAnalyzerGUI.Services
 			Console.WriteLine("FileSizeAnalyzer Pro");
 			Console.WriteLine("Version: 3.0.0");
 			Console.WriteLine("Open Source Edition");
-			Console.WriteLine("https://github.com/yourusername/FileSizeAnalyzerGUI");
+			Console.WriteLine("https://github.com/chrisdfennell/FileSizeAnalyzerGUI");
 			return 0;
 		}
 
