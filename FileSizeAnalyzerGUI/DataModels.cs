@@ -12,8 +12,8 @@ namespace FileSizeAnalyzerGUI
 {
     public class FilterPreset
     {
-        public string Name { get; set; }
-        public string ExtensionFilter { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string ExtensionFilter { get; set; } = string.Empty;
         public int SizeFilterIndex { get; set; }
         public int DateFilterIndex { get; set; }
         public DateTime? StartDate { get; set; }
@@ -22,17 +22,17 @@ namespace FileSizeAnalyzerGUI
 
     public class FileSystemNode : INotifyPropertyChanged
     {
-        public string FullPath { get; set; }
+        public string FullPath { get; set; } = string.Empty;
         public long Size { get; set; }
         public bool IsDirectory { get; set; }
         public ObservableCollection<FileSystemNode> Children { get; set; } = new ObservableCollection<FileSystemNode>();
-        public FileSystemNode Parent { get; set; }
+        public FileSystemNode? Parent { get; set; }
         public DateTime CreationTime { get; set; }
         public DateTime LastWriteTime { get; set; }
-        public string Extension => IsDirectory ? "" : Path.GetExtension(FullPath)?.ToLower();
+        public string? Extension => IsDirectory ? "" : Path.GetExtension(FullPath)?.ToLower();
         public Color BarFill { get; set; }
-        public string FormattedSize { get; set; }
-        public ImageSource Icon { get; set; }
+        public string FormattedSize { get; set; } = string.Empty;
+        public ImageSource? Icon { get; set; }
         public bool IsCloudOnly { get; set; }
 
         private double _barWidth;
@@ -49,8 +49,8 @@ namespace FileSizeAnalyzerGUI
             set { _isSelected = value; OnPropertyChanged(); }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? name = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
@@ -58,10 +58,10 @@ namespace FileSizeAnalyzerGUI
 
     public class DuplicateSet
     {
-        public string FileName { get; set; }
+        public string FileName { get; set; } = string.Empty;
         public int Count { get; set; }
-        public string FormattedSize { get; set; }
-        public ImageSource Icon { get; set; }
+        public string FormattedSize { get; set; } = string.Empty;
+        public ImageSource? Icon { get; set; }
         public ObservableCollection<FileSystemNode> Files { get; set; } = new ObservableCollection<FileSystemNode>();
     }
 
@@ -116,16 +116,36 @@ namespace FileSizeAnalyzerGUI
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
     }
 
+    public class PriorityColorConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string priority)
+            {
+                return priority switch
+                {
+                    "High" => new SolidColorBrush(Color.FromRgb(244, 67, 54)), // Red
+                    "Medium" => new SolidColorBrush(Color.FromRgb(255, 152, 0)), // Orange
+                    "Low" => new SolidColorBrush(Color.FromRgb(76, 175, 80)), // Green
+                    _ => Brushes.Gray
+                };
+            }
+            return Brushes.Gray;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
     public class FileTypeStats
     {
-        public string Extension { get; set; }
+        public string Extension { get; set; } = string.Empty;
         public long TotalSize { get; set; }
         public int FileCount { get; set; }
     }
 
     public class FileAgeStats
     {
-        public string Category { get; set; }
+        public string Category { get; set; } = string.Empty;
         public long TotalSize { get; set; }
         public int FileCount { get; set; }
         public void AddFile(long size) { TotalSize += size; FileCount++; }
@@ -134,7 +154,7 @@ namespace FileSizeAnalyzerGUI
     public class ScanHistoryEntry
     {
         public DateTime ScanDate { get; set; }
-        public string Path { get; set; }
+        public string Path { get; set; } = string.Empty;
         public long TotalSize { get; set; }
     }
 }

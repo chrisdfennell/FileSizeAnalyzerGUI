@@ -7,11 +7,19 @@
 		<UseWPF>true</UseWPF>
 		<ApplicationIcon>assets\icon.ico</ApplicationIcon>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<Version>3.0.0</Version>
+		<AssemblyVersion>3.0.0.0</AssemblyVersion>
+		<FileVersion>3.0.0.0</FileVersion>
+		<Product>FileSizeAnalyzer Pro</Product>
+		<Description>Professional disk space analyzer with advanced features</Description>
+		<Copyright>Open Source</Copyright>
 	</PropertyGroup>
 	<ItemGroup>
-		<Content Include="assets\icon.ico" />
+		<Content Include="Assets\icon.ico" />
 	</ItemGroup>
 	<ItemGroup>
+  <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc4.4" />
+  <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
   <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
   <PackageReference Include="System.Drawing.Common" Version="9.0.6" />
   <PackageReference Include="System.IO.Hashing" Version="8.0.0" />

@@ -1,18 +1,20 @@
-﻿<Window x:Class="FileSizeAnalyzerGUI.MainWindow"
+<Window x:Class="FileSizeAnalyzerGUI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileSizeAnalyzerGUI"
         mc:Ignorable="d"
-        Title="FileSizeAnalyzer Pro" Height="650" Width="1100"
+        Title="FileSizeAnalyzer Pro v3.0.0" Height="650" Width="1100"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <!-- Converters -->
         <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
         <local:FormatSizeConverter x:Key="FormatSizeConverter"/>
         <local:PathToNameConverter x:Key="PathToNameConverter"/>
+        <local:PriorityColorConverter x:Key="PriorityColorConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisConverter"/>
         <!-- Base Button Style -->
         <Style TargetType="{x:Type Button}">
@@ -224,7 +226,14 @@
                 </Grid.RowDefinitions>
                 <Menu Grid.Row="0" Background="Transparent" Foreground="{DynamicResource TextBrush}">
                     <MenuItem Header="_File">
-                        <MenuItem Header="_Export to CSV" Click="ExportButton_Click"/>
+                        <MenuItem Header="_Export Report">
+                            <MenuItem Header="Enhanced CSV Report..." Click="ExportCsvReport_Click"/>
+                            <MenuItem Header="JSON Report..." Click="ExportJsonReport_Click"/>
+                            <MenuItem Header="Enhanced HTML Report..." Click="ExportEnhancedHtmlReport_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Basic CSV (Legacy)" Click="ExportButton_Click"/>
+                            <MenuItem Header="Basic HTML (Legacy)" Click="ExportHtmlReport_Click"/>
+                        </MenuItem>
                         <MenuItem Header="_Settings" Click="SettingsButton_Click"/>
                         <Separator/>
                         <MenuItem Header="E_xit" Click="Exit_Click"/>
@@ -338,14 +347,151 @@
                             </TreeView.ItemTemplate>
                         </TreeView>
                     </TabItem>
+                    <TabItem Header="Dashboard">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10">
+                                <!-- Refresh Dashboard Button -->
+                                <Button Content="Refresh Dashboard" Click="RefreshDashboard_Click" Width="150" HorizontalAlignment="Left" Margin="0,0,0,15"/>
+
+                                <!-- Summary Card -->
+                                <Border BorderBrush="#333" BorderThickness="1" CornerRadius="5" Padding="15" Margin="0,0,0,15" Background="#1E1E1E">
+                                    <StackPanel>
+                                        <TextBlock Text="Summary" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+                                        <TextBlock x:Name="DashboardSummaryTextBlock" TextWrapping="Wrap" FontSize="13" LineHeight="20"
+                                                   Text="Click 'Refresh Dashboard' to see statistics and charts."/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Charts Grid -->
+                                <Grid Margin="0,0,0,15">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- File Type Distribution -->
+                                    <Border Grid.Column="0" BorderBrush="#333" BorderThickness="1" CornerRadius="5" Padding="15" Background="#1E1E1E">
+                                        <StackPanel>
+                                            <TextBlock Text="File Type Distribution (Top 10)" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                                            <ItemsControl x:Name="FileTypeChartList" MaxHeight="300">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="60"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="80"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Extension}" FontFamily="Consolas" FontWeight="SemiBold"/>
+                                                            <Border Grid.Column="1" Height="20" Background="#2E2E2E" CornerRadius="3" Margin="5,0">
+                                                                <Border HorizontalAlignment="Left" Background="#4CAF50" CornerRadius="3"
+                                                                        Width="{Binding BarWidth}" Height="20"/>
+                                                            </Border>
+                                                            <TextBlock Grid.Column="2" Text="{Binding FormattedSize}" FontFamily="Consolas" FontSize="11"
+                                                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Largest Folders -->
+                                    <Border Grid.Column="2" BorderBrush="#333" BorderThickness="1" CornerRadius="5" Padding="15" Background="#1E1E1E">
+                                        <StackPanel>
+                                            <TextBlock Text="Largest Folders (Top 10)" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                                            <ItemsControl x:Name="LargestFoldersChartList" MaxHeight="300">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="100"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                                                       ToolTip="{Binding Path}" VerticalAlignment="Center"/>
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                                                <Border Background="#2196F3" CornerRadius="3" Padding="5,2" Margin="0,0,5,0">
+                                                                    <TextBlock Text="{Binding FormattedSize}" FontFamily="Consolas" FontSize="10" FontWeight="SemiBold"/>
+                                                                </Border>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Disk Usage Gauge -->
+                                <Border BorderBrush="#333" BorderThickness="1" CornerRadius="5" Padding="15" Background="#1E1E1E">
+                                    <StackPanel>
+                                        <TextBlock Text="Disk Usage" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Usage Percentage -->
+                                            <Border Grid.Column="0" Width="100" Height="100" Margin="0,0,20,0">
+                                                <Grid>
+                                                    <Ellipse Stroke="#2E2E2E" StrokeThickness="15"/>
+                                                    <Ellipse x:Name="UsageGaugeEllipse" Stroke="#FF5722" StrokeThickness="15"
+                                                             StrokeDashArray="0,1000"/>
+                                                    <TextBlock x:Name="UsagePercentageText" Text="0%" FontSize="20" FontWeight="Bold"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+
+                                            <!-- Usage Stats -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Margin="0,5">
+                                                    <TextBlock Text="Total Scanned:" FontWeight="SemiBold" Width="120"/>
+                                                    <TextBlock x:Name="TotalScannedText" Text="0 B" FontFamily="Consolas"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,5">
+                                                    <TextBlock Text="Disk Used:" FontWeight="SemiBold" Width="120"/>
+                                                    <TextBlock x:Name="DiskUsedText" Text="0 B" FontFamily="Consolas" Foreground="#FF5722"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,5">
+                                                    <TextBlock Text="Disk Free:" FontWeight="SemiBold" Width="120"/>
+                                                    <TextBlock x:Name="DiskFreeText" Text="0 B" FontFamily="Consolas" Foreground="#4CAF50"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
                     <TabItem Header="File List">
                         <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" MinWidth="300"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="0.5*" MinWidth="250"/>
                             </Grid.ColumnDefinitions>
-                            <DataGrid x:Name="ResultsDataGrid" ItemsSource="{Binding SelectedFiles}" Grid.Column="0" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick" SelectionChanged="ResultsDataGrid_SelectionChanged">
+                            <WrapPanel Grid.Row="0" Grid.ColumnSpan="3" Margin="5" Background="{DynamicResource ControlBackgroundBrush}">
+                                <TextBlock Text="Quick Filters:" VerticalAlignment="Center" Margin="5,0,10,0" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                                <Button Content="All Files" Margin="2" Padding="8,3" Click="QuickFilter_AllFiles_Click"/>
+                                <Button Content="Modified Today" Margin="2" Padding="8,3" Click="QuickFilter_ModifiedToday_Click"/>
+                                <Button Content="Modified This Week" Margin="2" Padding="8,3" Click="QuickFilter_ModifiedThisWeek_Click"/>
+                                <Button Content="Modified This Month" Margin="2" Padding="8,3" Click="QuickFilter_ModifiedThisMonth_Click"/>
+                                <Button Content="100MB+" Margin="2" Padding="8,3" Click="QuickFilter_LargerThan100MB_Click"/>
+                                <Button Content="1GB+" Margin="2" Padding="8,3" Click="QuickFilter_LargerThan1GB_Click"/>
+                                <Button Content="Videos" Margin="2" Padding="8,3" Click="QuickFilter_Videos_Click"/>
+                                <Button Content="Images" Margin="2" Padding="8,3" Click="QuickFilter_Images_Click"/>
+                                <Button Content="Documents" Margin="2" Padding="8,3" Click="QuickFilter_Documents_Click"/>
+                                <Button Content="Archives" Margin="2" Padding="8,3" Click="QuickFilter_Archives_Click"/>
+                            </WrapPanel>
+                            <DataGrid x:Name="ResultsDataGrid" ItemsSource="{Binding SelectedFiles}" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick" SelectionChanged="ResultsDataGrid_SelectionChanged">
                                 <DataGrid.RowStyle>
                                     <Style TargetType="DataGridRow">
                                         <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
@@ -366,8 +512,8 @@
                                     <DataGridTextColumn Header="Extension" Binding="{Binding Extension}" Width="100"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-                            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderBrush}" />
-                            <Border Grid.Column="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="5">
+                            <GridSplitter Grid.Row="1" Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource BorderBrush}" />
+                            <Border Grid.Row="1" Grid.Column="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="5">
                                 <ScrollViewer>
                                     <StackPanel x:Name="PreviewPanel">
                                         <TextBlock Text="File Preview" FontWeight="Bold" Margin="0,0,0,5" Foreground="{DynamicResource TextBrush}"/>
@@ -377,6 +523,117 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </Border>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="Advanced Search">
+                        <Grid Margin="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Search Criteria -->
+                            <GroupBox Header="Search Criteria" Grid.Row="0" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Row 1: Name and Pattern Options -->
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,5">
+                                            <TextBlock Text="File Name Pattern:" Margin="0,0,0,3"/>
+                                            <TextBox x:Name="SearchNameTextBox" ToolTip="Enter file name, wildcard (* ?), or regex pattern"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,10,5">
+                                            <TextBlock Text="Options:" Margin="0,0,0,3"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <CheckBox x:Name="UseRegexCheckBox" Content="Use Regex" Margin="0,0,15,0"/>
+                                                <CheckBox x:Name="CaseSensitiveCheckBox" Content="Case Sensitive"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,5">
+                                            <TextBlock Text="Extension:" Margin="0,0,0,3"/>
+                                            <TextBox x:Name="ExtensionTextBox" ToolTip="e.g., .txt or txt"/>
+                                        </StackPanel>
+
+                                        <!-- Row 2: Size Filters -->
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,5">
+                                            <TextBlock Text="Min Size (MB):" Margin="0,0,0,3"/>
+                                            <TextBox x:Name="MinSizeTextBox" ToolTip="Minimum file size in megabytes"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,10,5">
+                                            <TextBlock Text="Max Size (MB):" Margin="0,0,0,3"/>
+                                            <TextBox x:Name="MaxSizeTextBox" ToolTip="Maximum file size in megabytes"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,5">
+                                            <TextBlock Text="Type:" Margin="0,0,0,3"/>
+                                            <ComboBox x:Name="FileTypeComboBox" SelectedIndex="0">
+                                                <ComboBoxItem Content="All" Tag="All"/>
+                                                <ComboBoxItem Content="Files Only" Tag="FilesOnly"/>
+                                                <ComboBoxItem Content="Folders Only" Tag="FoldersOnly"/>
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <!-- Row 3: Date Filters -->
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,10,5">
+                                            <TextBlock Text="Modified After:" Margin="0,0,0,3"/>
+                                            <DatePicker x:Name="ModifiedAfterPicker"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,10,5">
+                                            <TextBlock Text="Modified Before:" Margin="0,0,0,3"/>
+                                            <DatePicker x:Name="ModifiedBeforePicker"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,0,5">
+                                            <TextBlock Text="Path Contains:" Margin="0,0,0,3"/>
+                                            <TextBox x:Name="PathContainsTextBox" ToolTip="Search within full file path"/>
+                                        </StackPanel>
+
+                                        <!-- Row 4: Action Buttons -->
+                                        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,10,0,0">
+                                            <Button Content="Search" Click="ExecuteSearch_Click" Width="100" Margin="0,0,10,0" FontWeight="Bold"/>
+                                            <Button Content="Clear" Click="ClearSearch_Click" Width="100"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- Search Results -->
+                            <DataGrid Grid.Row="1" x:Name="SearchResultsDataGrid" ItemsSource="{Binding SearchResults}"
+                                      AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn>
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Name" Binding="{Binding FullPath, Converter={StaticResource PathToNameConverter}}" Width="200"/>
+                                    <DataGridTextColumn Header="Path" Binding="{Binding FullPath}" Width="*"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding FormattedSize}" Width="100"/>
+                                    <DataGridTextColumn Header="Extension" Binding="{Binding Extension}" Width="80"/>
+                                    <DataGridTextColumn Header="Last Modified" Binding="{Binding LastWriteTime, StringFormat='g'}" Width="150"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- Status Bar -->
+                            <TextBlock Grid.Row="2" x:Name="SearchStatusTextBlock" Margin="0,5,0,0" FontStyle="Italic"
+                                       Foreground="Gray" Text="Enter search criteria and click Search"/>
                         </Grid>
                     </TabItem>
                     <TabItem Header="Largest Files">
@@ -419,33 +676,175 @@
                             </DataGrid.Columns>
                         </DataGrid>
                     </TabItem>
+
+                    <!-- Duplicates tab with options + rule bar -->
                     <TabItem Header="Duplicates">
-                        <TreeView x:Name="DuplicatesTreeView" ItemsSource="{Binding Duplicates}" MouseDoubleClick="DuplicatesTreeView_MouseDoubleClick">
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate DataType="{x:Type local:DuplicateSet}" ItemsSource="{Binding Files}">
-                                    <StackPanel Orientation="Horizontal" ContextMenu="{StaticResource DuplicateSetContextMenu}">
-                                        <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,5,0" />
-                                        <TextBlock Text="{Binding FileName}" FontWeight="Bold"/>
-                                        <TextBlock Text="{Binding Count, StringFormat=' ({0} copies)'}" Margin="5,0,0,0"/>
-                                        <TextBlock Text="{Binding FormattedSize, StringFormat=', Total: {0}'}" Foreground="Gray" Margin="5,0,0,0"/>
-                                    </StackPanel>
-                                </HierarchicalDataTemplate>
-                                <DataTemplate DataType="{x:Type local:FileSystemNode}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                        <TextBlock Text="{Binding FullPath}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </TreeView.Resources>
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="{x:Type TreeViewItem}">
-                                    <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                        </TreeView>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Options toolbar -->
+                            <DockPanel Grid.Row="0" Margin="8" LastChildFill="False">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <CheckBox x:Name="VerifyDuplicatesCheckBox"
+                                              Content="Verify byte-by-byte"
+                                              IsChecked="False"
+                                              Margin="0,0,16,0"
+                                              ToolTip="When enabled, identical hashes are confirmed by a full byte compare (slower)."/>
+                                    <TextBlock Text="Min size:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <ComboBox x:Name="MinDupSizeCombo" Width="120"
+                                              ToolTip="Files smaller than this are ignored for duplicate detection.">
+                                        <ComboBoxItem Tag="65536">64 KB</ComboBoxItem>
+                                        <ComboBoxItem Tag="262144" IsSelected="True">256 KB</ComboBoxItem>
+                                        <ComboBoxItem Tag="1048576">1 MB</ComboBoxItem>
+                                        <ComboBoxItem Tag="10485760">10 MB</ComboBoxItem>
+                                    </ComboBox>
+                                    <Button Content="Export HTML Report..." Click="ExportHtmlReport_Click" Margin="16,0,0,0"/>
+                                </StackPanel>
+                            </DockPanel>
+
+                            <!-- Auto-select rules toolbar with new service -->
+                            <DockPanel Grid.Row="1" Margin="8,0,8,8" LastChildFill="False">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Auto-select:" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
+                                    <Button Content="Keep Newest" Click="AutoSelect_KeepNewest_AllGroups_Click" Margin="0,0,4,0" ToolTip="Keep the most recently modified file"/>
+                                    <Button Content="Keep Oldest" Click="AutoSelect_KeepOldest_AllGroups_Click" Margin="0,0,4,0" ToolTip="Keep the oldest file by modification date"/>
+                                    <Button Content="Keep Largest" Click="AutoSelect_KeepLargest_Click" Margin="0,0,4,0" ToolTip="Keep the largest file"/>
+                                    <Button Content="Keep Smallest" Click="AutoSelect_KeepSmallest_Click" Margin="0,0,4,0" ToolTip="Keep the smallest file"/>
+                                    <Button Content="Shortest Path" Click="AutoSelect_KeepShortestPath_Click" Margin="0,0,4,0" ToolTip="Keep file with shortest path"/>
+                                    <Button Content="1 per Folder" Click="AutoSelect_KeepOnePerFolder_Click" Margin="0,0,8,0" ToolTip="Keep one file per folder tree"/>
+                                    <Separator Margin="8,0"/>
+                                    <TextBlock x:Name="DuplicateStatsText" Text="Select duplicates using buttons above"
+                                               VerticalAlignment="Center" FontStyle="Italic" Foreground="#888"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <Button Content="⚠ Delete Selected" Click="DeleteSelectedDuplicates_Click" Margin="0,0,4,0"
+                                            Background="#D32F2F" Foreground="White" FontWeight="SemiBold"
+                                            ToolTip="Delete selected duplicate files (sends to Recycle Bin)"/>
+                                    <Button Content="📁 Move Selected..." Click="MoveSelectedDuplicates_Click" Margin="0,0,4,0"
+                                            ToolTip="Move selected duplicate files to another location"/>
+                                    <Button Content="🗜 Compress Selected..." Click="CompressSelectedDuplicates_Click"
+                                            ToolTip="Compress selected files into a ZIP archive"/>
+                                </StackPanel>
+                            </DockPanel>
+
+                            <!-- Duplicates list -->
+                            <Grid Grid.Row="2">
+                                <TreeView x:Name="DuplicatesTreeView" ItemsSource="{Binding Duplicates}" MouseDoubleClick="DuplicatesTreeView_MouseDoubleClick">
+                                    <TreeView.Resources>
+                                        <HierarchicalDataTemplate DataType="{x:Type local:DuplicateSet}" ItemsSource="{Binding Files}">
+                                            <StackPanel Orientation="Horizontal" ContextMenu="{StaticResource DuplicateSetContextMenu}">
+                                                <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,5,0" />
+                                                <TextBlock Text="{Binding FileName}" FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding Count, StringFormat=' ({0} copies)'}" Margin="5,0,0,0"/>
+                                                <TextBlock Text="{Binding FormattedSize, StringFormat=', Total: {0}'}" Foreground="Gray" Margin="5,0,0,0"/>
+                                            </StackPanel>
+                                        </HierarchicalDataTemplate>
+                                        <DataTemplate DataType="{x:Type local:FileSystemNode}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                <TextBlock Text="{Binding FullPath}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </TreeView.Resources>
+                                    <TreeView.ItemContainerStyle>
+                                        <Style TargetType="{x:Type TreeViewItem}">
+                                            <Setter Property="ContextMenu" Value="{StaticResource FileItemContextMenu}"/>
+                                        </Style>
+                                    </TreeView.ItemContainerStyle>
+                                </TreeView>
+                            </Grid>
+                        </Grid>
                     </TabItem>
+
                     <TabItem Header="Treemap">
-                        <Canvas x:Name="TreemapCanvas" SizeChanged="TreemapCanvas_SizeChanged"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="{DynamicResource ControlBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
+                                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                    <ItemsControl x:Name="BreadcrumbBar">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Content="{Binding Name}"
+                                                            Tag="{Binding Node}"
+                                                            Click="BreadcrumbButton_Click"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Foreground="{DynamicResource AccentBrush}"
+                                                            Cursor="Hand"
+                                                            Padding="4,2"
+                                                            Margin="0,0,4,0">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="Button">
+                                                                            <Border Background="{TemplateBinding Background}"
+                                                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                                                    Padding="{TemplateBinding Padding}">
+                                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                            </Border>
+                                                                            <ControlTemplate.Triggers>
+                                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                                    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                                                                </Trigger>
+                                                                            </ControlTemplate.Triggers>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                    <TextBlock Text="›"
+                                                               Foreground="{DynamicResource GlyphBrush}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0,0,4,0"
+                                                               Visibility="{Binding ShowSeparator, Converter={StaticResource BoolToVisConverter}}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+                            <Canvas x:Name="TreemapCanvas" Grid.Row="1" SizeChanged="TreemapCanvas_SizeChanged"/>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="Sunburst Chart">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <ItemsControl Grid.Row="0" x:Name="SunburstBreadcrumbBar" Margin="5">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="{Binding Name}" Tag="{Binding Node}" Click="BreadcrumbButton_Click" Style="{StaticResource {x:Type Button}}" Padding="5,2" Margin="2"/>
+                                            <TextBlock Text=" > " VerticalAlignment="Center" Visibility="{Binding ShowSeparator, Converter={StaticResource BoolToVisConverter}}" Foreground="{DynamicResource TextBrush}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Canvas x:Name="SunburstCanvas" Grid.Row="1" SizeChanged="SunburstCanvas_SizeChanged" MouseLeftButtonDown="SunburstCanvas_MouseLeftButtonDown"/>
+                        </Grid>
                     </TabItem>
                     <TabItem Header="File Types">
                         <DataGrid x:Name="FileTypesDataGrid" ItemsSource="{Binding FileTypes}" AutoGenerateColumns="False" IsReadOnly="True">
@@ -465,8 +864,129 @@
                             </DataGrid.Columns>
                         </DataGrid>
                     </TabItem>
+                    <TabItem Header="Temporary Files">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5">
+                                <TextBlock Text="Temporary &amp; Cache Files - Review before cleanup" FontWeight="Bold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
+                                <Button Content="Clean Selected" Margin="10,0,0,0" Padding="10,5" Click="CleanupTempFiles_Click"/>
+                            </StackPanel>
+                            <DataGrid Grid.Row="1" x:Name="TempFilesDataGrid" ItemsSource="{Binding TemporaryFileCategories}" AutoGenerateColumns="False" IsReadOnly="True">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Category" Binding="{Binding Name}" Width="200"/>
+                                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
+                                    <DataGridTextColumn Header="File Count" Binding="{Binding Files.Count}" Width="100"/>
+                                    <DataGridTextColumn Header="Total Size" Binding="{Binding TotalSize, Converter={StaticResource FormatSizeConverter}}" Width="120"/>
+                                    <DataGridCheckBoxColumn Header="Safe" Binding="{Binding IsSafeToDelete, Mode=OneWay}" Width="60" IsReadOnly="True"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="Stale Files">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Files not modified in 1+ year - Good candidates for archival or deletion" Margin="5" FontStyle="Italic" Foreground="{DynamicResource TextBrush}"/>
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding StaleFiles}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="File Path" Binding="{Binding File.FullPath}" Width="*"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding File.Size, Converter={StaticResource FormatSizeConverter}}" Width="120"/>
+                                    <DataGridTextColumn Header="Days Since Modified" Binding="{Binding DaysSinceLastModified}" Width="150"/>
+                                    <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="100"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="Large Rarely-Used">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Large files (100MB+) not accessed in 6+ months - Consider archiving" Margin="5" FontStyle="Italic" Foreground="{DynamicResource TextBrush}"/>
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding LargeRarelyUsedFiles}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ResultsDataGrid_MouseDoubleClick">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="File Path" Binding="{Binding File.FullPath}" Width="*"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding File.Size, Converter={StaticResource FormatSizeConverter}}" Width="120"/>
+                                    <DataGridTextColumn Header="Days Since Access" Binding="{Binding DaysSinceLastAccess}" Width="150"/>
+                                    <DataGridTextColumn Header="Recommendation" Binding="{Binding Recommendation}" Width="250"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </TabItem>
                     <TabItem Header="Reports">
-                        <TextBox x:Name="ReportsTextBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="5"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10">
+                                <!-- Generate Recommendations Button -->
+                                <Button Content="Generate Cleanup Recommendations" Click="GenerateRecommendations_Click" Width="250" HorizontalAlignment="Left" Margin="0,0,0,15"/>
+
+                                <!-- Overall Summary -->
+                                <GroupBox Header="Summary" Margin="0,0,0,15">
+                                    <TextBlock x:Name="RecommendationSummaryTextBlock" TextWrapping="Wrap" Margin="5"
+                                               Text="Click 'Generate Cleanup Recommendations' to analyze your disk and get personalized cleanup suggestions."/>
+                                </GroupBox>
+
+                                <!-- Recommendations List -->
+                                <GroupBox Header="Cleanup Recommendations" Margin="0,0,0,15">
+                                    <ItemsControl x:Name="RecommendationsList" Margin="5">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="#333" BorderThickness="1" Margin="0,0,0,10" Padding="10" CornerRadius="3">
+                                                    <StackPanel>
+                                                        <!-- Category and Priority -->
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                                            <TextBlock Text="{Binding Category}" FontWeight="Bold" FontSize="14" Margin="0,0,10,0"/>
+                                                            <TextBlock Text="{Binding Priority, StringFormat='[{0} Priority]'}"
+                                                                       FontSize="12" Foreground="{Binding Priority, Converter={StaticResource PriorityColorConverter}}"
+                                                                       FontWeight="SemiBold"/>
+                                                        </StackPanel>
+
+                                                        <!-- Description -->
+                                                        <TextBlock Text="{Binding Description}" Margin="0,0,0,5" TextWrapping="Wrap"/>
+
+                                                        <!-- Stats -->
+                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                                            <TextBlock Text="Potential Savings: " FontWeight="SemiBold"/>
+                                                            <TextBlock Text="{Binding FormattedSavings}" Foreground="#4CAF50" FontWeight="Bold"/>
+                                                            <TextBlock Text=" | " Margin="10,0"/>
+                                                            <TextBlock Text="Files: " FontWeight="SemiBold"/>
+                                                            <TextBlock Text="{Binding FileCount, StringFormat='{}{0:N0}'}"/>
+                                                        </StackPanel>
+
+                                                        <!-- Action -->
+                                                        <TextBlock Text="{Binding Action, StringFormat='Recommended Action: {0}'}"
+                                                                   Margin="0,0,0,5" FontStyle="Italic" Foreground="#2196F3"/>
+
+                                                        <!-- Sample Files -->
+                                                        <TextBlock Text="Sample Files:" FontWeight="SemiBold" Margin="0,5,0,2"/>
+                                                        <ItemsControl ItemsSource="{Binding SampleFiles}" Margin="15,0,0,0">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="10"
+                                                                               Foreground="#666" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </GroupBox>
+
+                                <!-- Legacy Report Section -->
+                                <GroupBox Header="Detailed Scan Report" Margin="0,0,0,15">
+                                    <TextBox x:Name="ReportsTextBox" IsReadOnly="True" TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto" MinHeight="200" Margin="5"
+                                             FontFamily="Consolas" FontSize="11"/>
+                                </GroupBox>
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
                     <TabItem Header="Scan History">
                         <DataGrid x:Name="ScanHistoryDataGrid" ItemsSource="{Binding ScanHistory}" AutoGenerateColumns="False" IsReadOnly="True" MouseDoubleClick="ScanHistoryDataGrid_MouseDoubleClick">
@@ -476,6 +996,81 @@
                                 <DataGridTextColumn Header="Total Size" Binding="{Binding TotalSize, Converter={StaticResource FormatSizeConverter}}" Width="150"/>
                             </DataGrid.Columns>
                         </DataGrid>
+                    </TabItem>
+                    <TabItem Header="Trends &amp; Analytics">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10">
+                                <!-- Refresh Button -->
+                                <Button Content="Refresh Trends" Click="RefreshTrends_Click" Width="120" HorizontalAlignment="Left" Margin="0,0,0,15"/>
+
+                                <!-- Trend Analysis -->
+                                <GroupBox Header="Trend Analysis" Margin="0,0,0,15">
+                                    <StackPanel>
+                                        <TextBlock x:Name="TrendsSummaryTextBlock" TextWrapping="Wrap" Margin="5"
+                                                   Text="Click 'Refresh Trends' to analyze disk space trends over time."/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- Recommendations -->
+                                <GroupBox Header="Recommendations" Margin="0,0,0,15">
+                                    <TextBlock x:Name="TrendsRecommendationTextBlock" TextWrapping="Wrap" Margin="5"
+                                               Text="Run multiple scans over time to get personalized recommendations."/>
+                                </GroupBox>
+
+                                <!-- Growth Predictions -->
+                                <GroupBox Header="Growth Predictions" Margin="0,0,0,15">
+                                    <ItemsControl x:Name="PredictionsList" Margin="5">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" Margin="0,2"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </GroupBox>
+
+                                <!-- Space Breakdown -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- By Extension -->
+                                    <GroupBox Header="Top Extensions" Grid.Column="0" Margin="0,0,5,0">
+                                        <ItemsControl x:Name="ExtensionBreakdownList" Margin="5">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" Margin="0,2" FontFamily="Consolas"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </GroupBox>
+
+                                    <!-- By Age -->
+                                    <GroupBox Header="By File Age" Grid.Column="1" Margin="5,0">
+                                        <ItemsControl x:Name="AgeBreakdownList" Margin="5">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" Margin="0,2" FontFamily="Consolas"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </GroupBox>
+
+                                    <!-- By Category -->
+                                    <GroupBox Header="By Category" Grid.Column="2" Margin="5,0,0,0">
+                                        <ItemsControl x:Name="CategoryBreakdownList" Margin="5">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" Margin="0,2" FontFamily="Consolas"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </GroupBox>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
                 </TabControl>
             </Grid>

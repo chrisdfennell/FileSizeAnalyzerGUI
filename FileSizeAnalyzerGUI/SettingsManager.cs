@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -19,8 +19,8 @@ namespace FileSizeAnalyzerGUI
         {
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string appFolderPath = Path.Combine(appDataPath, "FileSizeAnalyzerPro");
-            Directory.CreateDirectory(appFolderPath); // Ensure the directory exists
-            _settingsFilePath = Path.Combine(appFolderPath, "settings.json");
+            Directory.CreateDirectory(appFolderPath);
+            _settingsFilePath = Path.Combine(appFolderPath, Constants.Settings.SettingsFileName);
         }
 
         public static AppSettings LoadSettings()

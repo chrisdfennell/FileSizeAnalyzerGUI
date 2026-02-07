@@ -81,6 +81,15 @@
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ContextMenu}">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="2" SnapsToDevicePixels="True">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>
