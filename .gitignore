@@ -1,0 +1,41 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.vs/
+.vs/
+*.DotSettings.user
+
+## NuGet
+*.nupkg
+packages/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Test results
+TestResults/
+coverage/
+
+## OS
+Thumbs.db
+*.DS_Store
+
+## IDE
+.idea/
+*.sln.iml
+
+## Publish output
+publish/
+.claude/
