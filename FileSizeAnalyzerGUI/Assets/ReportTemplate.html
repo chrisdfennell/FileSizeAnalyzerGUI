@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Disk Report</title>
+    <style>
+        :root {
+            --fg: #111;
+            --muted: #666;
+            --bg: #fff;
+            --line: #e5e7eb;
+            --chip: #f3f4f6;
+            --accent: #2563eb;
+        }
+
+        html, body {
+            background: var(--bg);
+            color: var(--fg);
+            font: 14px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;
+            margin: 0
+        }
+
+        .wrap {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px
+        }
+
+        h1 {
+            font-size: 20px;
+            margin: 0 0 8px
+        }
+
+        h2 {
+            font-size: 16px;
+            margin: 24px 0 8px
+        }
+
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 12px
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px;
+            background: #fff
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        th, td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top
+        }
+
+        th {
+            background: #fafafa;
+            font-weight: 600
+        }
+
+        code.badge {
+            background: var(--chip);
+            padding: 2px 6px;
+            border-radius: 6px
+        }
+
+        .treemap {
+            height: 360px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            gap: 2px
+        }
+
+        .tm-node {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-start;
+            padding: 6px;
+            box-sizing: border-box;
+            background: #e0ecff
+        }
+
+            .tm-node span {
+                font-size: 12px;
+                background: rgba(255,255,255,.85);
+                padding: 2px 4px;
+                border-radius: 4px;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap
+            }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px
+        }
+
+        @media (max-width:900px) {
+            .kpis {
+                grid-template-columns: repeat(2,1fr)
+            }
+
+            .row {
+                grid-template-columns: 1fr
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>Disk Report</h1>
+        <div class="muted" id="summary-line"></div>
+
+        <div class="kpis">
+            <div class="card"><div class="muted">Total size</div><div id="kpi-total" style="font-size:18px;font-weight:700"></div></div>
+            <div class="card"><div class="muted">Files</div><div id="kpi-files" style="font-size:18px;font-weight:700"></div></div>
+            <div class="card"><div class="muted">Duplicate groups</div><div id="kpi-dupe-groups" style="font-size:18px;font-weight:700"></div></div>
+            <div class="card"><div class="muted">Duplicate bytes</div><div id="kpi-dupe-bytes" style="font-size:18px;font-weight:700"></div></div>
+        </div>
+
+        <h2>Treemap (Top-level folders)</h2>
+        <div id="treemap" class="treemap"></div>
+
+        <div class="row">
+            <div class="card">
+                <h2 style="margin-top:0">Largest files</h2>
+                <table id="tbl-largest">
+                    <thead><tr><th>Path</th><th>Size</th><th>Modified</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2 style="margin-top:0">By file type</h2>
+                <table id="tbl-types">
+                    <thead><tr><th>Extension</th><th>Files</th><th>Total size</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top:0">Duplicate sets</h2>
+            <table id="tbl-dupes">
+                <thead><tr><th>Hash</th><th>Count</th><th>Total size</th><th>Sample paths</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- The app injects JSON here -->
+    <script id="scan-data" type="application/json">__SCAN_JSON__</script>
+
+    <script>
+(function(){
+  const humanSize = b => {
+    if (!b || b <= 0) return "0 B";
+    const u=['B','KB','MB','GB','TB','PB']; let i=0, n=b;
+    while(n>=1024 && i<u.length-1){ n/=1024; i++; }
+    return n.toFixed(n>=100||i===0?0:n>=10?1:2) + " " + u[i];
+  };
+
+  const el = document.getElementById('scan-data');
+  let rows = [];
+  try { rows = JSON.parse(el.textContent || "[]"); } catch(e){ rows=[]; }
+  // normalize / guard
+  rows = Array.isArray(rows) ? rows : [];
+
+  // KPIs
+  const totalSize = rows.reduce((s,r)=>s+(r.size||0),0);
+  const byHash = rows.reduce((m,r)=>{
+    if (r.hash){ const k=r.hash; if(!m[k]) m[k]=[]; m[k].push(r); }
+    return m;
+  },{});
+  const dupeGroups = Object.values(byHash).filter(g=>g.length>1);
+  const dupeBytes = dupeGroups.reduce((s,g)=> s + g.reduce((x,r)=>x+(r.size||0),0) - Math.max(...g.map(r=>r.size||0)), 0);
+
+  document.getElementById('kpi-total').textContent = humanSize(totalSize);
+  document.getElementById('kpi-files').textContent = rows.length.toLocaleString();
+  document.getElementById('kpi-dupe-groups').textContent = dupeGroups.length.toLocaleString();
+  document.getElementById('kpi-dupe-bytes').textContent = humanSize(dupeBytes);
+  document.getElementById('summary-line').textContent =
+    `Generated ${new Date().toLocaleString()} � Paths scanned: ${rows.length.toLocaleString()}`;
+
+  // Largest files
+  const tbodyLargest = document.querySelector('#tbl-largest tbody');
+  rows.slice().sort((a,b)=>(b.size||0)-(a.size||0)).slice(0,50).forEach(r=>{
+    const tr=document.createElement('tr');
+    const d=new Date(r.modified||'');
+    tr.innerHTML = `<td><code class="badge" title="${r.path}">${r.path}</code></td>
+                    <td>${humanSize(r.size||0)}</td>
+                    <td>${isNaN(d)?'�':d.toLocaleString()}</td>`;
+    tbodyLargest.appendChild(tr);
+  });
+
+  // File types
+  const ext = p => {
+    const m = (p||'').match(/\.([^.\\\/]+)$/); return (m?m[1].toLowerCase():'(none)');
+  };
+  const byExt = {};
+  rows.forEach(r=>{
+    const e = ext(r.path);
+    if(!byExt[e]) byExt[e] = {count:0,size:0};
+    byExt[e].count++; byExt[e].size += (r.size||0);
+  });
+  const tbodyTypes = document.querySelector('#tbl-types tbody');
+  Object.entries(byExt).sort((a,b)=>b[1].size-a[1].size).slice(0,50).forEach(([e,agg])=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${e}</td><td>${agg.count.toLocaleString()}</td><td>${humanSize(agg.size)}</td>`;
+    tbodyTypes.appendChild(tr);
+  });
+
+  // Duplicates
+  const tbodyDupes = document.querySelector('#tbl-dupes tbody');
+  dupeGroups.sort((a,b)=>{
+    const sa=a.reduce((s,r)=>s+(r.size||0),0);
+    const sb=b.reduce((s,r)=>s+(r.size||0),0);
+    return sb-sa;
+  }).slice(0,200).forEach(g=>{
+    const size = g.reduce((s,r)=>s+(r.size||0),0);
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td><code class="badge">${g[0].hash}</code></td>
+                    <td>${g.length}</td>
+                    <td>${humanSize(size)}</td>
+                    <td>${g.slice(0,5).map(x=>`<div><code class="badge" title="${x.path}">${x.path}</code></div>`).join('')}</td>`;
+    tbodyDupes.appendChild(tr);
+  });
+
+  // Treemap (simple slice-and-dice on top-level folder)
+  const getTop = p=>{
+    if(!p) return '(unknown)';
+    // Windows drive? "C:\foo\bar"
+    const m = p.match(/^[A-Za-z]:\\([^\\]+)/); if(m) return m[1];
+    // UNC or POSIX
+    const parts = p.replace(/^\\\\/,'/').replaceAll('\\','/').split('/').filter(Boolean);
+    return parts[0] || '(root)';
+  };
+  const byTop = {};
+  rows.forEach(r=>{
+    const k = getTop(r.path);
+    if(!byTop[k]) byTop[k]={size:0,count:0};
+    byTop[k].size += (r.size||0); byTop[k].count++;
+  });
+  const items = Object.entries(byTop).sort((a,b)=>b[1].size-a[1].size);
+  const tm = document.getElementById('treemap');
+  tm.innerHTML = '';
+  const total = items.reduce((s,[,v])=>s+v.size,0);
+  if (!total || !items.length){
+    tm.innerHTML = '<div style="padding:10px;color:#888">No data to render.</div>';
+  } else {
+    items.forEach(([name,v])=>{
+      const pct = Math.max(0.01, v.size/total);
+      const div = document.createElement('div');
+      div.className = 'tm-node';
+      div.style.flex = pct + ' 1 0';
+      div.title = `${name} � ${v.count.toLocaleString()} files � ${humanSize(v.size)}`;
+      div.innerHTML = `<span>${name} � ${humanSize(v.size)}</span>`;
+      tm.appendChild(div);
+    });
+  }
+})();
+    </script>
+</body>
+</html>
