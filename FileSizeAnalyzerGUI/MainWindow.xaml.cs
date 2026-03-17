@@ -98,19 +98,26 @@ namespace FileSizeAnalyzerGUI
         {
             if (_cliArgs == null) return;
 
-            ViewModel.ScanPath = _cliArgs["-path"];
-            DirectoryPathTextBox.Text = _cliArgs["-path"];
-            await ViewModel.RunScanAsync();
-
-            if (_cliArgs.TryGetValue("-export", out var exportPath))
+            try
             {
-                if (string.IsNullOrWhiteSpace(exportPath))
-                    exportPath = $"FileSizeAnalyzer-Report-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
-                await Task.Run(() => CsvExporter.ExportToCsv(ViewModel.AllFiles.ToList(), exportPath));
-            }
+                ViewModel.ScanPath = _cliArgs["-path"];
+                DirectoryPathTextBox.Text = _cliArgs["-path"];
+                await ViewModel.RunScanAsync();
 
-            if (_cliArgs.ContainsKey("-exit"))
-                Application.Current.Shutdown();
+                if (_cliArgs.TryGetValue("-export", out var exportPath))
+                {
+                    if (string.IsNullOrWhiteSpace(exportPath))
+                        exportPath = $"FileSizeAnalyzer-Report-{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv";
+                    await Task.Run(() => CsvExporter.ExportToCsv(ViewModel.AllFiles.ToList(), exportPath));
+                }
+
+                if (_cliArgs.ContainsKey("-exit"))
+                    Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during CLI startup: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         #region Window Control and Setup
@@ -156,7 +163,14 @@ namespace FileSizeAnalyzerGUI
             var sunburstCanvas = FindName("SunburstCanvas") as Canvas;
             sunburstCanvas?.Children.Clear();
 
-            await ViewModel.RunScanAsync();
+            try
+            {
+                await ViewModel.RunScanAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Scan failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
 
             // Reset UI after scan
             ProgressTextBlock.Text = "Analysis Complete.";
@@ -213,8 +227,15 @@ namespace FileSizeAnalyzerGUI
 
             if (sfd.ShowDialog() == true)
             {
-                await Task.Run(() => CsvExporter.ExportToCsv(ViewModel.AllFiles.ToList(), sfd.FileName));
-                MessageBox.Show($"Exported to {sfd.FileName}");
+                try
+                {
+                    await Task.Run(() => CsvExporter.ExportToCsv(ViewModel.AllFiles.ToList(), sfd.FileName));
+                    MessageBox.Show($"Exported to {sfd.FileName}");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -241,8 +262,15 @@ namespace FileSizeAnalyzerGUI
 
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.DataContext is FileSystemNode node)
-                await DeleteFileAsync(node);
+            try
+            {
+                if ((sender as FrameworkElement)?.DataContext is FileSystemNode node)
+                    await DeleteFileAsync(node);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Delete failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         #endregion
@@ -251,6 +279,8 @@ namespace FileSizeAnalyzerGUI
 
         private async void CleanupTempFiles_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
             var tempDataGrid = FindName("TempFilesDataGrid") as DataGrid;
             if (tempDataGrid == null) return;
 
@@ -276,6 +306,11 @@ namespace FileSizeAnalyzerGUI
                 var filesToDelete = selectedCategories.SelectMany(c => c.Files).ToList();
                 await DeleteMultipleFilesAsync(filesToDelete);
             }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Cleanup failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         #endregion
@@ -284,45 +319,66 @@ namespace FileSizeAnalyzerGUI
 
         private async void DeleteSelected_Click(object sender, RoutedEventArgs e)
         {
-            var itemsToDelete = ViewModel.GetSelectedItemsForDeletion();
-
-            if (!itemsToDelete.Any())
+            try
             {
-                MessageBox.Show("No items selected for deletion.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+                var itemsToDelete = ViewModel.GetSelectedItemsForDeletion();
 
-            string message = $"Are you sure you want to move {itemsToDelete.Count} selected item(s) to the Recycle Bin?";
-            if (MessageBox.Show(message, "Confirm Bulk Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
-                await DeleteMultipleFilesAsync(itemsToDelete.ToList());
+                if (!itemsToDelete.Any())
+                {
+                    MessageBox.Show("No items selected for deletion.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                string message = $"Are you sure you want to move {itemsToDelete.Count} selected item(s) to the Recycle Bin?";
+                if (MessageBox.Show(message, "Confirm Bulk Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                    await DeleteMultipleFilesAsync(itemsToDelete.ToList());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Delete failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void MoveSelected_Click(object sender, RoutedEventArgs e)
         {
-            var selectedItems = ViewModel.AllFiles.Where(f => f.IsSelected && !f.IsDirectory).ToList();
-            if (selectedItems.Count == 0)
+            try
             {
-                MessageBox.Show("No files selected.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+                var selectedItems = ViewModel.AllFiles.Where(f => f.IsSelected && !f.IsDirectory).ToList();
+                if (selectedItems.Count == 0)
+                {
+                    MessageBox.Show("No files selected.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
 
-            var dialog = new OpenFolderDialog { Title = "Select destination folder" };
-            if (dialog.ShowDialog() == true)
-                await MoveFilesAsync(selectedItems, dialog.FolderName);
+                var dialog = new OpenFolderDialog { Title = "Select destination folder" };
+                if (dialog.ShowDialog() == true)
+                    await MoveFilesAsync(selectedItems, dialog.FolderName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Move failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void CopySelected_Click(object sender, RoutedEventArgs e)
         {
-            var selectedItems = ViewModel.AllFiles.Where(f => f.IsSelected && !f.IsDirectory).ToList();
-            if (selectedItems.Count == 0)
+            try
             {
-                MessageBox.Show("No files selected.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
+                var selectedItems = ViewModel.AllFiles.Where(f => f.IsSelected && !f.IsDirectory).ToList();
+                if (selectedItems.Count == 0)
+                {
+                    MessageBox.Show("No files selected.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
 
-            var dialog = new OpenFolderDialog { Title = "Select destination folder" };
-            if (dialog.ShowDialog() == true)
-                await CopyFilesAsync(selectedItems, dialog.FolderName);
+                var dialog = new OpenFolderDialog { Title = "Select destination folder" };
+                if (dialog.ShowDialog() == true)
+                    await CopyFilesAsync(selectedItems, dialog.FolderName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Copy failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async Task MoveFilesAsync(List<FileSystemNode> files, string destinationFolder)
@@ -486,12 +542,26 @@ namespace FileSizeAnalyzerGUI
 
         private async void ResultsDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (ResultsDataGrid.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf);
+            try
+            {
+                if (ResultsDataGrid.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Delete failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void DuplicatesTreeView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (DuplicatesTreeView.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf);
+            try
+            {
+                if (DuplicatesTreeView.SelectedItem is FileSystemNode sf) await DeleteFileAsync(sf);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Delete failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void ScanHistoryDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -506,8 +576,15 @@ namespace FileSizeAnalyzerGUI
 
         private async void ResultsDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ResultsDataGrid.SelectedItem is FileSystemNode sf)
-                await PreviewFileInUIAsync(sf);
+            try
+            {
+                if (ResultsDataGrid.SelectedItem is FileSystemNode sf)
+                    await PreviewFileInUIAsync(sf);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Preview failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async Task PreviewFileInUIAsync(FileSystemNode file)
@@ -964,48 +1041,57 @@ namespace FileSizeAnalyzerGUI
 
         private async void DeleteSelectedDuplicates_Click(object sender, RoutedEventArgs e)
         {
-            var selectedFiles = ViewModel.GetSelectedDuplicateFiles();
-            if (!selectedFiles.Any())
+            try
             {
-                MessageBox.Show("No files selected for deletion.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
+                var selectedFiles = ViewModel.GetSelectedDuplicateFiles();
+                if (!selectedFiles.Any())
+                {
+                    MessageBox.Show("No files selected for deletion.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var totalSize = selectedFiles.Sum(f => f.Size);
+                var result = MessageBox.Show(
+                    $"Delete {selectedFiles.Count:N0} selected duplicate files ({MainViewModel.FormatSize(totalSize)})?\n\n" +
+                    "Files will be sent to the Recycle Bin and can be restored if needed.",
+                    "Confirm Deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                if (result != MessageBoxResult.Yes) return;
+
+                var progressWindow = CreateProgressWindow("Deleting Files", "Deleting files...");
+                var progress = CreateProgressReporter(progressWindow);
+                progressWindow.Show();
+
+                var deleteResult = await ViewModel.DeleteFilesAsync(
+                    selectedFiles.Select(f => f.FullPath).ToList(), useRecycleBin: true, progress);
+
+                progressWindow.Close();
+
+                if (deleteResult.Success)
+                {
+                    MessageBox.Show(
+                        $"Successfully deleted {deleteResult.SuccessCount:N0} files ({MainViewModel.FormatSize(deleteResult.TotalSize)}).",
+                        "Deletion Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ViewModel.RemoveDeletedFilesFromDuplicates(selectedFiles);
+                }
+                else
+                {
+                    var errorMsg = $"Deleted {deleteResult.SuccessCount:N0} files, {deleteResult.FailedCount:N0} failed.\n\n";
+                    if (deleteResult.Errors.Any())
+                        errorMsg += "First few errors:\n" + string.Join("\n", deleteResult.Errors.Take(5));
+                    MessageBox.Show(errorMsg, "Deletion Completed with Errors", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
-
-            var totalSize = selectedFiles.Sum(f => f.Size);
-            var result = MessageBox.Show(
-                $"Delete {selectedFiles.Count:N0} selected duplicate files ({MainViewModel.FormatSize(totalSize)})?\n\n" +
-                "Files will be sent to the Recycle Bin and can be restored if needed.",
-                "Confirm Deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes) return;
-
-            var progressWindow = CreateProgressWindow("Deleting Files", "Deleting files...");
-            var progress = CreateProgressReporter(progressWindow);
-            progressWindow.Show();
-
-            var deleteResult = await ViewModel.DeleteFilesAsync(
-                selectedFiles.Select(f => f.FullPath).ToList(), useRecycleBin: true, progress);
-
-            progressWindow.Close();
-
-            if (deleteResult.Success)
+            catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Successfully deleted {deleteResult.SuccessCount:N0} files ({MainViewModel.FormatSize(deleteResult.TotalSize)}).",
-                    "Deletion Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                ViewModel.RemoveDeletedFilesFromDuplicates(selectedFiles);
-            }
-            else
-            {
-                var errorMsg = $"Deleted {deleteResult.SuccessCount:N0} files, {deleteResult.FailedCount:N0} failed.\n\n";
-                if (deleteResult.Errors.Any())
-                    errorMsg += "First few errors:\n" + string.Join("\n", deleteResult.Errors.Take(5));
-                MessageBox.Show(errorMsg, "Deletion Completed with Errors", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Delete failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private async void MoveSelectedDuplicates_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
             var selectedFiles = ViewModel.GetSelectedDuplicateFiles();
             if (!selectedFiles.Any())
             {
@@ -1066,10 +1152,17 @@ namespace FileSizeAnalyzerGUI
                 $"Time: {moveResult.Duration.TotalSeconds:F1}s",
                 "Move Complete", MessageBoxButton.OK,
                 moveResult.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Move failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void CompressSelectedDuplicates_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
             var selectedFiles = ViewModel.GetSelectedDuplicateFiles();
             if (!selectedFiles.Any())
             {
@@ -1121,6 +1214,11 @@ namespace FileSizeAnalyzerGUI
                 MessageBox.Show(
                     $"Compression completed with errors.\nSuccessful: {compressResult.SuccessCount:N0}\nFailed: {compressResult.FailedCount:N0}",
                     "Compression Complete", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Compression failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

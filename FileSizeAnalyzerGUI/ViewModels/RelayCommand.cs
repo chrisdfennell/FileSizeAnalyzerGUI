@@ -67,6 +67,16 @@ namespace FileSizeAnalyzerGUI.ViewModels
             {
                 await _execute(parameter);
             }
+            catch (OperationCanceledException)
+            {
+                // Expected cancellation — no action needed
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    $"An unexpected error occurred: {ex.Message}",
+                    "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
             finally
             {
                 _isExecuting = false;

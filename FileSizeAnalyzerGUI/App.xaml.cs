@@ -13,6 +13,14 @@ namespace FileSizeAnalyzerGUI
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            DispatcherUnhandledException += (_, args) =>
+            {
+                MessageBox.Show(
+                    $"An unexpected error occurred:\n\n{args.Exception.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                args.Handled = true;
+            };
+
             ThemeManager.ApplyTheme();
             base.OnStartup(e);
 
@@ -24,8 +32,8 @@ namespace FileSizeAnalyzerGUI
                 var firstArg = e.Args[0].ToLower();
                 if (IsCLICommand(firstArg))
                 {
-                    // Run in CLI mode (console mode)
-                    RunCLIModeAsync(e.Args).GetAwaiter().GetResult();
+                    // Run on thread pool to avoid deadlocking the WPF dispatcher
+                    Task.Run(() => RunCLIModeAsync(e.Args)).GetAwaiter().GetResult();
                     Shutdown();
                     return;
                 }

@@ -339,7 +339,8 @@ namespace FileSizeAnalyzerGUI.ViewModels
             _exclusionList = SettingsManager.LoadSettings().ExclusionPatterns;
 
             _cts?.Dispose();
-            _cts = new CancellationTokenSource();
+            var cts = new CancellationTokenSource();
+            _cts = cts;
             _scanErrors.Clear();
             ClearCollections();
             IsScanning = true;
@@ -395,13 +396,13 @@ namespace FileSizeAnalyzerGUI.ViewModels
 
             try
             {
-                var result = await _scannerService.ScanDirectoryAsync(ScanPath, scanOptions, nodeProgress, textProgress, percentProgress, _cts.Token);
+                var result = await _scannerService.ScanDirectoryAsync(ScanPath, scanOptions, nodeProgress, textProgress, percentProgress, cts.Token);
                 _scanErrors.Append(result.Errors);
 
-                if (!_cts.Token.IsCancellationRequested)
+                if (!cts.Token.IsCancellationRequested)
                 {
                     ProgressText = "Finalizing analysis...";
-                    await FinalizeAnalysisAsync(ScanPath);
+                    await FinalizeAnalysisAsync(ScanPath, cts);
                 }
                 else
                 {
@@ -422,12 +423,13 @@ namespace FileSizeAnalyzerGUI.ViewModels
             {
                 IsScanning = false;
                 ProgressText = "Analysis Complete.";
-                _cts?.Dispose();
-                _cts = null;
+                cts.Dispose();
+                if (_cts == cts)
+                    _cts = null;
             }
         }
 
-        private async Task FinalizeAnalysisAsync(string scanPath)
+        private async Task FinalizeAnalysisAsync(string scanPath, CancellationTokenSource cts)
         {
             _logger.Info("Starting finalization analysis");
             var allFoundFiles = AllFiles.ToList();
@@ -451,14 +453,15 @@ namespace FileSizeAnalyzerGUI.ViewModels
                 ForceVerifyAboveBytes = Constants.DuplicateDetection.DefaultForceVerifyAboveBytes
             };
 
-            if (_cts == null || _cts.Token.IsCancellationRequested) return;
+            if (cts.Token.IsCancellationRequested) return;
 
+            var token = cts.Token;
             var analysisTasks = new List<Task>
             {
-                Task.Run(() => _duplicateService.FindDuplicates(allFoundFiles, duplicateProgress, _cts.Token, duplicateOptions), _cts.Token),
-                Task.Run(() => _scannerService.FindEmptyFolders(rootNode, emptyFolderProgress, _cts.Token), _cts.Token),
-                Task.Run(() => _analysisService.GetFileTypeStats(allFoundFiles, fileTypeProgress, _cts.Token), _cts.Token),
-                Task.Run(() => _analysisService.GetFileAgeStats(allFoundFiles, fileAgeProgress, _cts.Token), _cts.Token)
+                Task.Run(() => _duplicateService.FindDuplicates(allFoundFiles, duplicateProgress, token, duplicateOptions), token),
+                Task.Run(() => _scannerService.FindEmptyFolders(rootNode, emptyFolderProgress, token), token),
+                Task.Run(() => _analysisService.GetFileTypeStats(allFoundFiles, fileTypeProgress, token), token),
+                Task.Run(() => _analysisService.GetFileAgeStats(allFoundFiles, fileAgeProgress, token), token)
             };
 
             try
@@ -471,7 +474,7 @@ namespace FileSizeAnalyzerGUI.ViewModels
                 return;
             }
 
-            if (_cts == null || _cts.Token.IsCancellationRequested) return;
+            if (token.IsCancellationRequested) return;
 
             var tempCategories = _tempFilesService.AnalyzeTemporaryFiles(allFoundFiles);
             foreach (var category in tempCategories)
